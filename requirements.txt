@@ -80,7 +80,7 @@ pyrsistent==0.15.1
 PyStanfordDependencies==0.3.1
 python-dateutil==2.6.1
 pytz==2017.3
-PyYAML==3.12
+PyYAML==5.1
 pyzmq==18.0.1
 qtconsole==4.4.4
 rsa==3.4.2
