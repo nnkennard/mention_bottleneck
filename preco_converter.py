@@ -1,3 +1,4 @@
+import ontonotes_converter
 import os
 import json
 import convert_lib
@@ -65,6 +66,8 @@ def create_dataset(filename):
           sentence_offsets[modified_sentence] + end - 1])
         new_document.clusters.append(new_cluster)
     dataset.documents.append(new_document)
+    #if len(dataset.documents) == 100:
+    #    break
 
   return dataset
 
@@ -89,7 +92,7 @@ def resplit(preco_directory, resplit_directory):
     with open(resplit_directory + "/test.jsonl", 'w') as g:
       g.write(f.read())
 
-def convert(data_home):
+def convert(data_home, ontonotes_file):
   preco_directory = os.path.join(data_home, "PreCo_1.0")
   resplit_directory = os.path.join(data_home, "processed", PRECO, "resplit")
   convert_lib.create_processed_data_dir(resplit_directory)
@@ -99,14 +102,54 @@ def convert(data_home):
 
   convert_lib.create_processed_data_dir(output_directory)
   preco_datasets = {}
-  for split in [convert_lib.DatasetSplit.train, convert_lib.DatasetSplit.dev,
-    convert_lib.DatasetSplit.test]:
-  # for split in [convert_lib.DatasetSplit.dev]:
+  #for split in [convert_lib.DatasetSplit.train, convert_lib.DatasetSplit.dev,
+  #  convert_lib.DatasetSplit.test]:
+  for split in [convert_lib.DatasetSplit.dev]:
     input_filename = os.path.join(resplit_directory, split + "." +
         convert_lib.FormatName.jsonl)
     converted_dataset = create_dataset(input_filename)
     convert_lib.write_converted(converted_dataset, output_directory + "/" + split)
     preco_datasets[split] = converted_dataset
+ 
+  BERS_FIELD_MAP = dict(ontonotes_converter.ONTONOTES_FIELD_MAP)
+  del BERS_FIELD_MAP[convert_lib.LabelSequences.PARSE]
+  bers_ontonotes_dataset = ontonotes_converter.create_dataset(
+      ontonotes_file, BERS_FIELD_MAP)
+
+  bers_doc_ids = set()
+  for doc in bers_ontonotes_dataset.documents:
+    bers_doc_ids.add("_".join(doc.doc_id.split("-")[-1].split("_")[:-1]))
+  preco_doc_ids = set([doc.doc_id for doc in preco_datasets["dev"].documents])
+
+  #print(bers_doc_ids.intersection(preco_doc_ids))
+  #print(bers_doc_ids)
+  #print(preco_doc_ids)
+  print(len(bers_doc_ids))
+  print(len(preco_doc_ids))
+
+  for doc in bers_ontonotes_dataset.documents:
+    short_doc_id = "_".join(doc.doc_id.split("-")[-1].split("_")[:-1])
+    print(short_doc_id)
+    flag = False
+    for preco_doc in preco_datasets[convert_lib.DatasetSplit.dev].documents:
+      #print(short_doc_id, preco_doc.doc_id)
+      if preco_doc.doc_id == short_doc_id:
+        if not preco_doc.sentences == doc.sentences:
+          print(len(preco_doc.sentences), len(doc.sentences))
+          if len(preco_doc.sentences) == len(doc.sentences):
+            for a, b in zip(preco_doc.sentences, doc.sentences):
+              if a == b:
+                print(a)
+              else:
+                print("babababa********")
+                print(a)
+                print(b)
+          elif len(preco_doc.sentences) > len(doc.sentences):
+            print("Original longer")
+          else:
+            print("preprocessed longer")
+        break
+    
 
 
   mult_directory = output_directory.replace(PRECO, "preco_mult")
