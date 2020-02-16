@@ -8,17 +8,17 @@ import os
 import numpy as np
 
 class DatasetName(object):
-  conll12 = 'conll12' 
+  conll = 'conll' 
   preco = 'preco'
   preco_mult = 'preco_mult'
-  ALL_DATASETS = [conll12, preco, preco_mult]
+  ALL_DATASETS = [conll, preco, preco_mult]
 
 
 class DatasetSplit(object):
   train = 'train'
   test = 'test'
   dev = 'dev'
-  valid = 'valid'
+  ALL = [train, dev, test]
 
 
 class FormatName(object):

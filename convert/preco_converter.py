@@ -1,4 +1,3 @@
-import ontonotes_converter
 import os
 import json
 import convert_lib

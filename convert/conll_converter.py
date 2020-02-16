@@ -2,7 +2,7 @@ import convert_lib
 import collections
 import os
 
-CONLL12 = convert_lib.DatasetName.conll12
+CONLL = convert_lib.DatasetName.conll
 
 def coref_to_spans(coref_col, offset):
   span_starts = collections.defaultdict(list)
@@ -87,7 +87,7 @@ def add_sentence(curr_doc, curr_sent, doc_spans, sentence_offset):
 
 def create_dataset(filename, field_map):
  
-  dataset = convert_lib.Dataset(CONLL12)
+  dataset = convert_lib.Dataset(CONLL)
 
   document_counter = 0
   sentence_offset = 0
@@ -135,11 +135,11 @@ ONTONOTES_FIELD_MAP = {
 }
 
 def convert(data_home):
-  ontonotes_directory = os.path.join(data_home, "original", "CoNLL12/flat/")
-  output_directory = os.path.join(data_home, "processed", CONLL12)
-  convert_lib.create_processed_data_dir(output_directory)
-  ontonotes_datasets = {}
-  for split in [convert_lib.DatasetSplit.train, convert_lib.DatasetSplit.dev]:
-    input_filename = ''.join([ontonotes_directory, split, ".", convert_lib.FormatName.txt])
+  input_directory = os.path.join(data_home, "original", CONLL)
+  output_directory = os.path.join(data_home, "processed", CONLL)
+  convert_lib.create_dir(output_directory)
+  conll_datasets = {}
+  for split in convert_lib.DatasetSplit.ALL:
+    input_filename = os.path.join(input_directory, "conll12_" + split + ".txt")
     converted_dataset = create_dataset(input_filename, ONTONOTES_FIELD_MAP)
     convert_lib.write_converted(converted_dataset, output_directory + "/" + split)
