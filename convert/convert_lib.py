@@ -27,10 +27,6 @@ class FormatName(object):
   file_per_doc = 'file_per_doc'
   ALL_FORMATS = [jsonl, file_per_doc]
 
-def get_filename(data_home, dataset_name, dataset_split, format_name):
-  return os.path.join(data_home, 'processed', dataset_name,
-      dataset_split + "." + format_name)
-
 def create_dir(path):
   try:
       os.makedirs(path)
@@ -40,10 +36,11 @@ def create_dir(path):
       print ("Successfully created the directory %s " % path)
 
 def make_doc_id(dataset, doc_name):
+  if dataset.startswith('preco'):
+    dataset = "nw_" + preco # Placeholder domain for preco 
   if type(doc_name) == list:
     doc_name = "_".join(doc_name)
   return "_".join([dataset, doc_name])
-  assert False
 
 
 class Dataset(object):
@@ -51,14 +48,12 @@ class Dataset(object):
     self.name = dataset_name
     self.documents = []
 
-  def _dump_lines(self, function, file_handle):
+  def dump_to_jsonl(self, file_name):
     lines = []
     for doc in self.documents:
-      lines += doc.apply_dump_fn(function)
-    file_handle.write("\n".join(lines))
-
-  def dump_to_jsonl(self, file_handle):
-    self._dump_lines("jsonl", file_handle)
+      lines += doc.dump_to_jsonl()
+    with open(file_name, 'w') as f:
+      f.write("\n".join(lines))
 
   def dump_to_fpd(self, directory):
     create_dir(directory)
@@ -95,17 +90,22 @@ class Document(object):
 
     self.label_sequences = {}
 
-    self.FN_MAP = {
-      "jsonl": self.dump_to_jsonl,
-      "file_per_doc": self.dump_to_fpd}
-
   def dump_to_fpd(self):
     return [" ".join(sentence) for sentence in self.sentences]
+  def dump_to_jsonl(self):
 
+    return [json.dumps({
+          "doc_key": self.doc_id + "_" + self.doc_part,
+          "document_id": self.doc_id + "_" + self.doc_part,
+          "sentences": self.sentences,
+          "speakers": self.speakers,
+          "clusters": self.clusters,
+          "parse_spans": self.parse_spans,
+          "pos": self.pos,
+          "singletons": self.singletons
+        })]
 
-  def apply_dump_fn(self, function):
-    return self.FN_MAP[function]()
-
+  _unused_stuff = """
   def _get_conll_coref_labels(self):
     coref_labels = collections.defaultdict(list)
     for cluster, tok_idxs in enumerate(self.clusters):
@@ -117,28 +117,9 @@ class Document(object):
           coref_labels[tok_end].append("{})".format(cluster))
 
     return coref_labels
-
-  def remove_singletons(self):
-    new_clusters = []
-    for cluster in self.clusters:
-      if len(cluster) > 1:
-        new_clusters.append(cluster)
-    self.clusters = new_clusters
-
-  def dump_to_jsonl(self):
-
-    return [json.dumps({
-          "doc_key": self.doc_id + "_" + self.doc_part,
-          "document_id": self.doc_id + "_" + self.doc_part,
-          "sentences": self.sentences,
-          "speakers": self.speakers,
-          "clusters": self.clusters,
-          "parse_spans": self.parse_spans,
-          "pos": self.pos
-        })]
+  """
 
 
 def write_converted(dataset, prefix):
     dataset.dump_to_fpd(prefix + "-fpd/")
-    with open(prefix + ".jsonl", 'w') as f:
-      dataset.dump_to_jsonl(f)
+    dataset.dump_to_jsonl(prefix + ".jsonl")

@@ -8,6 +8,14 @@ PRECO = convert_lib.DatasetName.preco
 PRECO_MULT = convert_lib.DatasetName.preco_mult
 DUMMY_DOC_PART = '0'
 
+def remove_singletons(self):
+  new_clusters = []
+  for cluster in self.clusters:
+    if len(cluster) > 1:
+      new_clusters.append(cluster)
+  self.clusters = new_clusters
+
+
 def get_lines_from_file(filename):
   with open(filename, 'r') as f:
     return f.readlines()
