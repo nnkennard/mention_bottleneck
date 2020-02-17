@@ -99,7 +99,6 @@ def add_sentence(curr_doc, curr_sent, doc_coref_map, doc_parse_map,
 
   parse_span_map = build_parse_span_map(
       curr_sent[convert_lib.LabelSequences.PARSE], sentence_offset)
-  #curr_doc.parse_spans.append(parse_spans) # Do we need this?
   doc_parse_map = ldd_append(doc_parse_map, parse_span_map)
 
   coref_spans = sum(coref_span_map.values(), [])

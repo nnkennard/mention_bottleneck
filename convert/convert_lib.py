@@ -99,10 +99,9 @@ class Document(object):
           "document_id": self.doc_id + "_" + self.doc_part,
           "sentences": self.sentences,
           "speakers": self.speakers,
-          "clusters": self.clusters,
+          "clusters": self.clusters + self.singletons,
           "parse_spans": self.parse_spans,
           "pos": self.pos,
-          "singletons": self.singletons
         })]
 
   _unused_stuff = """

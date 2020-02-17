@@ -8,14 +8,6 @@ PRECO = convert_lib.DatasetName.preco
 PRECO_MULT = convert_lib.DatasetName.preco_mult
 DUMMY_DOC_PART = '0'
 
-def remove_singletons(self):
-  new_clusters = []
-  for cluster in self.clusters:
-    if len(cluster) > 1:
-      new_clusters.append(cluster)
-  self.clusters = new_clusters
-
-
 def get_lines_from_file(filename):
   with open(filename, 'r') as f:
     return f.readlines()
@@ -51,8 +43,6 @@ def make_empty_speakers(sentences):
   return [["" for token in sent] for sent in sentences]
 
 def create_dataset(filename):
-  print(filename)
-
   dataset = convert_lib.Dataset(PRECO)
   lines = get_lines_from_file(filename)
 
@@ -63,7 +53,8 @@ def create_dataset(filename):
     sentence_offsets = []
     token_count = 0
   
-    new_sentences, sentence_index_map, sentence_offsets = condense_sentences(orig_document["sentences"])
+    new_sentences, sentence_index_map, sentence_offsets = condense_sentences(
+        orig_document["sentences"])
   
     new_document.sentences = new_sentences
     new_document.speakers = make_empty_speakers(new_document.sentences)
@@ -76,8 +67,6 @@ def create_dataset(filename):
           sentence_offsets[modified_sentence] + end - 1])
         new_document.clusters.append(new_cluster)
     dataset.documents.append(new_document)
-    #if len(dataset.documents) == 100:
-    #    break
 
   return dataset
 
