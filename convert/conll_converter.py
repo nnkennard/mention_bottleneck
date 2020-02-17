@@ -61,18 +61,20 @@ def build_parse_span_map(parse_col, offset):
   stack = []
   label_map = {}
   for i, orig_label in enumerate(parse_col):
-    labels = split_parse_label(orig_label)
+    labels = split_parse_label(orig_label) # Chunking around parens
     for label in labels:
-      if label.endswith(")"): # End of chunk, hopefully start was registered
-        span_start, start_idx = stack.pop(0)
-        assert (span_start, i) not in label_map
-        label_map[(start_idx, i)] = span_start + label
-      elif label.startswith("("): # Register start of a label
-        stack.insert(0, [label, i])
+      if label.startswith("("): # Register start of a label
+        stack.insert(0, [label, i + offset]) # Goes on the top of the stack
+        # ^ build up label in [0], remember start (with offset) in [1]
+      elif label.endswith(")"): # End of chunk, hopefully start was registered
+        span_prefix, start_idx = stack.pop(0)
+        assert (span_prefix, i) not in label_map # This is an unclosed span
+        label_map[
+            (start_idx, i + offset)] = span_prefix + label # Label is suffix
       else:
-        stack[0][0] += label
+        stack[0][0] += label # This is part of the label we're currently collecting
 
-  return [(k[0] + offset, k[1] + offset, v) for k,v in label_map.items()]
+  return label_map
 
 def ldd_append(ldd, to_append):
   for k, v in to_append.items():
@@ -85,28 +87,30 @@ def get_lines_from_file(filename):
 
 MARKABLES_REGEX = r"\(NP\**\)"
 
-def add_sentence(curr_doc, curr_sent, doc_span_map, sentence_offset):
+def add_sentence(curr_doc, curr_sent, doc_coref_map, doc_parse_map,
+                 sentence_offset):
   curr_doc.speakers.append(curr_sent[convert_lib.LabelSequences.SPEAKER])
   curr_doc.sentences.append(curr_sent[convert_lib.LabelSequences.WORD])
   curr_doc.pos.append(curr_sent[convert_lib.LabelSequences.POS])
 
   coref_span_map = build_coref_span_map(
       curr_sent[convert_lib.LabelSequences.COREF], sentence_offset)
-  doc_span_map = ldd_append(doc_span_map, coref_span_map)
+  doc_coref_map = ldd_append(doc_coref_map, coref_span_map)
 
-  parse_spans = build_parse_span_map(
+  parse_span_map = build_parse_span_map(
       curr_sent[convert_lib.LabelSequences.PARSE], sentence_offset)
-  curr_doc.parse_spans.append(parse_spans)
+  #curr_doc.parse_spans.append(parse_spans) # Do we need this?
+  doc_parse_map = ldd_append(doc_parse_map, parse_span_map)
 
   coref_spans = sum(coref_span_map.values(), [])
-  singletons = [(start, end)
-      for start, end, label in parse_spans if (
-        re.match(MARKABLES_REGEX, label)
-        and (start, end) not in coref_spans)]
+  singletons = [span
+      for span, label in parse_span_map.items() if (
+        re.match(MARKABLES_REGEX, label) and span not in coref_spans)]
+  # For now, singletons are NPs that aren't in clusters
 
   sentence_offset += len(curr_sent[convert_lib.LabelSequences.WORD])
 
-  return doc_span_map, sentence_offset
+  return doc_coref_map, doc_parse_map, sentence_offset
 
 
 def create_dataset(filename, field_map):
@@ -119,7 +123,8 @@ def create_dataset(filename, field_map):
   curr_doc = None
   curr_doc_id = None
   curr_sent = collections.defaultdict(list)
-  doc_span_map = collections.defaultdict(list)
+  doc_coref_map = collections.defaultdict(list)
+  doc_parse_map = collections.defaultdict(list)
 
   for line in get_lines_from_file(filename):
 
@@ -131,26 +136,24 @@ def create_dataset(filename, field_map):
       sentence_offset = 0
     
     elif line.startswith("#end"):
-      curr_doc.clusters = list(doc_span_map.values())
+      curr_doc.clusters = list(doc_coref_map.values())
       dataset.documents.append(curr_doc)
-      doc_span_map = collections.defaultdict(list)
+      doc_coref_map = collections.defaultdict(list)
+      doc_parse_map = collections.defaultdict(list)
       curr_doc = None
 
     elif not line.strip():
       if curr_sent:
-        doc_span_map, sentence_offset = add_sentence(
-          curr_doc, curr_sent, doc_span_map, sentence_offset)
+        doc_coref_map, doc_parse_map, sentence_offset = add_sentence(
+          curr_doc, curr_sent, doc_coref_map, doc_parse_map, sentence_offset)
         curr_sent = collections.defaultdict(list)
 
-    else:
+    else: # Empty line signifies the end of a sentence
       fields = line.replace("/.", ".").split()
       for field_name, field_index in field_map.items():
         curr_sent[field_name].append(fields[field_index])
 
-
   return dataset
-
-
 
 
 def convert(data_home):
