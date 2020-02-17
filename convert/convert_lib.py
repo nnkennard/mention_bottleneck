@@ -10,9 +10,10 @@ import numpy as np
 
 class DatasetName(object):
   conll = 'conll_mult' 
+  conll_sing = 'conll_sing'
   preco = 'preco_sing'
   preco_mult = 'preco_mult'
-  ALL_DATASETS = [conll, preco, preco_mult]
+  ALL_DATASETS = [conll, conll_sing, preco, preco_mult]
 
 
 class DatasetSplit(object):

@@ -1,5 +1,7 @@
 import conll_lib
+import convert_lib
 
+import os
 import re
 import sys
 
@@ -24,6 +26,7 @@ def conll_add_singletons(dataset):
   new_dataset = []
   for document in dataset:
     new_dataset.append(doc_add_singletons(document)) 
+  return new_dataset
 
 
 def create_singleton_labels(singletons, cluster_offset, doc_len):
@@ -87,23 +90,35 @@ def doc_add_singletons(document):
         else:
           sent[i][coref_idx] += singleton_label
 
-    print("\n".join(str(i) for i in sent)) 
-        
-    
-  
+  return document
 
+def write_conll_to_file(conll_list_dataset, output_filename):
+  with open(output_filename, 'w') as f:
+    for document in conll_list_dataset:
+      for sentence in document:
+        if sentence[0][0].startswith("#"):
+          assert len(sentence) == 1
+          f.write("\t".join(sentence[0]) + "\n")
+        else:
+          f.write("\n".join("\t".join(word) for word in sentence))
+          f.write("\n\n")
+          
 def main():
-  # Read in one sentence at a tim
-  # Add singleton labels
 
-  filename = sys.argv[1]
+  data_home = sys.argv[1]
 
-  dataset = conll_lib.listify_conll_dataset(filename)
-
-  conll_sing = conll_add_singletons(dataset)
   
-  pass
+  input_directory = os.path.join(
+      data_home, "original", convert_lib.DatasetName.conll)
+  output_directory = os.path.join(
+      data_home, "original", convert_lib.DatasetName.conll_sing)
+  convert_lib.create_dir(output_directory)
 
-
+  for split in convert_lib.DatasetSplit.ALL:
+    input_filename = os.path.join(input_directory, "conll12_" + split + ".txt")
+    output_filename = os.path.join(output_directory, "conll12_" + split + ".txt")
+    dataset = conll_lib.listify_conll_dataset(input_filename)
+    conll_sing = conll_add_singletons(dataset)
+    write_conll_to_file(conll_sing, output_filename)
 if __name__ == "__main__":
   main()
