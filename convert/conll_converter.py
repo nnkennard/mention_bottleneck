@@ -87,6 +87,15 @@ def get_lines_from_file(filename):
 
 MARKABLES_REGEX = r"\(NP\**\)"
 
+POS_MARKABLES = ["VB", "VBD", "VBG", "VBN", "VBP", "VBZ", "PRP", "PRP$"]
+
+def get_pos_markables(pos_sequence):
+  pos_markables = []
+  for i, pos in enumerate(pos_sequence):
+    if pos in POS_MARKABLES:
+      pos_markables.append((i, i))
+  return pos_markables
+
 def add_sentence(curr_doc, curr_sent, doc_coref_map, doc_parse_map,
                  sentence_offset):
   curr_doc.speakers.append(curr_sent[convert_lib.LabelSequences.SPEAKER])
@@ -105,7 +114,9 @@ def add_sentence(curr_doc, curr_sent, doc_coref_map, doc_parse_map,
   singletons = [span
       for span, label in parse_span_map.items() if (
         re.match(MARKABLES_REGEX, label) and span not in coref_spans)]
-  # For now, singletons are NPs that aren't in clusters
+  singletons += get_pos_markables(curr_sent[convert_lib.LabelSequences.POS])
+  singletons = list(set(singletons))
+  # For now, singletons are NPs, PRPs and VBs that aren't in clusters
 
   sentence_offset += len(curr_sent[convert_lib.LabelSequences.WORD])
 
