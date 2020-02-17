@@ -7,6 +7,7 @@ import json
 import os
 import numpy as np
 
+
 class DatasetName(object):
   conll = 'conll' 
   preco = 'preco'
@@ -90,6 +91,7 @@ class Document(object):
     self.clusters = []
     self.parse_spans = []
     self.pos = []
+    self.singletons = []
 
     self.label_sequences = {}
 

@@ -1,40 +1,52 @@
 import convert_lib
 import collections
 import os
+import re
 
 CONLL = convert_lib.DatasetName.conll
 
-def coref_to_spans(coref_col, offset):
+CONLL_FIELD_MAP = {
+  convert_lib.LabelSequences.WORD: 3,
+  convert_lib.LabelSequences.POS: 4, 
+  convert_lib.LabelSequences.PARSE: 5, 
+  convert_lib.LabelSequences.SPEAKER: 9, 
+  convert_lib.LabelSequences.COREF: -1,
+}
+
+def build_coref_span_map(coref_col, offset):
   span_starts = collections.defaultdict(list)
   complete_spans = []
   for i, orig_label in enumerate(coref_col):
-    if orig_label == '-':
+    if orig_label == '-': # no coref label
       continue
     else:
-      labels = orig_label.split("|")
+      labels = orig_label.split("|") # split for multiple (nested) case
       for label in labels:
-        if label.startswith("("):
-          if label.endswith(")"):
+        if label.startswith("("): # Span start
+          if label.endswith(")"): # Single-token span
             complete_spans.append((i, i, label[1:-1]))
           else:
-            span_starts[label[1:]].append(i)
+            span_starts[label[1:]].append(i) # Register span start for later
         elif label.endswith(")"):
-          ending_cluster = label[:-1]
+          ending_cluster = label[:-1] # Which cluster is ending here
           assert len(span_starts[ending_cluster]) in [1, 2]
-          maybe_start_idx = span_starts[ending_cluster].pop(-1)
-          complete_spans.append((maybe_start_idx, i, ending_cluster))
+          # Sometimes it's closing a nested span but apparently never more than
+          # two levels for the same entity
+          start_idx = span_starts[ending_cluster].pop(-1)
+          # The one added latest is the match
+          complete_spans.append((start_idx, i, ending_cluster))
 
   span_dict = collections.defaultdict(list)
   for start, end, cluster in complete_spans:
     span_dict[cluster].append((offset + start, offset + end))
-
+    # offset is the token offset of the sentence within the document
   return span_dict
 
 def split_parse_label(label):
   curr_chunk = ""
   chunks = []
   for c in label:
-    if c in "()":
+    if c in "()": # A chunk is everything up to a paren
       if curr_chunk:
         chunks.append(curr_chunk)
       curr_chunk = c
@@ -44,22 +56,23 @@ def split_parse_label(label):
   return chunks
 
 
-def parse_to_spans(parse_col):
+def build_parse_span_map(parse_col, offset):
   span_starts = collections.defaultdict(list)
   stack = []
   label_map = {}
   for i, orig_label in enumerate(parse_col):
     labels = split_parse_label(orig_label)
     for label in labels:
-      if label.endswith(")"):
+      if label.endswith(")"): # End of chunk, hopefully start was registered
         span_start, start_idx = stack.pop(0)
         assert (span_start, i) not in label_map
         label_map[(start_idx, i)] = span_start + label
-      elif label.startswith("("):
+      elif label.startswith("("): # Register start of a label
         stack.insert(0, [label, i])
       else:
         stack[0][0] += label
-  return [(k[0], k[1], v) for k,v in label_map.items()]
+
+  return [(k[0] + offset, k[1] + offset, v) for k,v in label_map.items()]
 
 def ldd_append(ldd, to_append):
   for k, v in to_append.items():
@@ -70,19 +83,30 @@ def get_lines_from_file(filename):
   with open(filename, 'r') as f:
     return f.readlines()
 
-def add_sentence(curr_doc, curr_sent, doc_spans, sentence_offset):
+MARKABLES_REGEX = r"\(NP\**\)"
+
+def add_sentence(curr_doc, curr_sent, doc_span_map, sentence_offset):
   curr_doc.speakers.append(curr_sent[convert_lib.LabelSequences.SPEAKER])
   curr_doc.sentences.append(curr_sent[convert_lib.LabelSequences.WORD])
-  coref_spans = coref_to_spans(
-      curr_sent[convert_lib.LabelSequences.COREF], sentence_offset)
-  doc_spans = ldd_append(doc_spans, coref_spans)
-  parse_spans = parse_to_spans(
-      curr_sent[convert_lib.LabelSequences.PARSE])
-  curr_doc.parse_spans.append(parse_spans)
   curr_doc.pos.append(curr_sent[convert_lib.LabelSequences.POS])
 
+  coref_span_map = build_coref_span_map(
+      curr_sent[convert_lib.LabelSequences.COREF], sentence_offset)
+  doc_span_map = ldd_append(doc_span_map, coref_span_map)
 
-  return doc_spans, sentence_offset + len(curr_sent[convert_lib.LabelSequences.WORD])
+  parse_spans = build_parse_span_map(
+      curr_sent[convert_lib.LabelSequences.PARSE], sentence_offset)
+  curr_doc.parse_spans.append(parse_spans)
+
+  coref_spans = sum(coref_span_map.values(), [])
+  singletons = [(start, end)
+      for start, end, label in parse_spans if (
+        re.match(MARKABLES_REGEX, label)
+        and (start, end) not in coref_spans)]
+
+  sentence_offset += len(curr_sent[convert_lib.LabelSequences.WORD])
+
+  return doc_span_map, sentence_offset
 
 
 def create_dataset(filename, field_map):
@@ -95,7 +119,7 @@ def create_dataset(filename, field_map):
   curr_doc = None
   curr_doc_id = None
   curr_sent = collections.defaultdict(list)
-  doc_spans = collections.defaultdict(list)
+  doc_span_map = collections.defaultdict(list)
 
   for line in get_lines_from_file(filename):
 
@@ -107,14 +131,15 @@ def create_dataset(filename, field_map):
       sentence_offset = 0
     
     elif line.startswith("#end"):
-      curr_doc.clusters = list(doc_spans.values())
+      curr_doc.clusters = list(doc_span_map.values())
       dataset.documents.append(curr_doc)
-      doc_spans = collections.defaultdict(list)
+      doc_span_map = collections.defaultdict(list)
       curr_doc = None
 
     elif not line.strip():
       if curr_sent:
-        doc_spans, sentence_offset = add_sentence(curr_doc, curr_sent, doc_spans, sentence_offset)
+        doc_span_map, sentence_offset = add_sentence(
+          curr_doc, curr_sent, doc_span_map, sentence_offset)
         curr_sent = collections.defaultdict(list)
 
     else:
@@ -126,13 +151,7 @@ def create_dataset(filename, field_map):
   return dataset
 
 
-ONTONOTES_FIELD_MAP = {
-  convert_lib.LabelSequences.WORD: 3,
-  convert_lib.LabelSequences.POS: 4, 
-  convert_lib.LabelSequences.PARSE: 5, 
-  convert_lib.LabelSequences.SPEAKER: 9, 
-  convert_lib.LabelSequences.COREF: -1,
-}
+
 
 def convert(data_home):
   input_directory = os.path.join(data_home, "original", CONLL)
@@ -141,5 +160,5 @@ def convert(data_home):
   conll_datasets = {}
   for split in convert_lib.DatasetSplit.ALL:
     input_filename = os.path.join(input_directory, "conll12_" + split + ".txt")
-    converted_dataset = create_dataset(input_filename, ONTONOTES_FIELD_MAP)
+    converted_dataset = create_dataset(input_filename, CONLL_FIELD_MAP)
     convert_lib.write_converted(converted_dataset, output_directory + "/" + split)
