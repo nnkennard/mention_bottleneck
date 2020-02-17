@@ -9,8 +9,8 @@ import numpy as np
 
 
 class DatasetName(object):
-  conll = 'conll' 
-  preco = 'preco'
+  conll = 'conll_mult' 
+  preco = 'preco_sing'
   preco_mult = 'preco_mult'
   ALL_DATASETS = [conll, preco, preco_mult]
 
@@ -37,7 +37,7 @@ def create_dir(path):
 
 def make_doc_id(dataset, doc_name):
   if dataset.startswith('preco'):
-    dataset = "nw_" + preco # Placeholder domain for preco 
+    dataset = "nw_" + dataset # Placeholder domain for preco 
   if type(doc_name) == list:
     doc_name = "_".join(doc_name)
   return "_".join([dataset, doc_name])

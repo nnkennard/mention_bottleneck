@@ -28,7 +28,7 @@ def main():
   data_dir = sys.argv[1]
 
   preco_orig_dir = os.path.join(data_dir, "original", "PreCo_1.0")
-  preco_dir = os.path.join(data_dir, "original", "preco")
+  preco_dir = os.path.join(data_dir, "original", "preco_sing")
   preco_mult_dir = os.path.join(data_dir, "original", "preco_mult")
   
   convert_lib.create_dir(preco_dir)
