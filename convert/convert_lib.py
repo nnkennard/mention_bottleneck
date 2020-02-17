@@ -67,15 +67,6 @@ def flatten(l):
   return sum(l, [])
 
 
-class LabelSequences(object):
-  WORD = "WORD"
-  POS = "POS"
-  NER = "NER"
-  PARSE = "PARSE"
-  COREF = "COREF"
-  SPEAKER = "SPEAKER"
-
-
 class Document(object):
   def __init__(self, doc_id, doc_part):
     self.doc_id = doc_id
