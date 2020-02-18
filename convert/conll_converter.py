@@ -52,12 +52,17 @@ def create_dataset(filename):
   return dataset
 
 
-def convert(data_home):
-  input_directory = os.path.join(data_home, "original", CONLL)
-  output_directory = os.path.join(data_home, "processed", CONLL)
+def convert_subdataset(data_home, dataset_name):
+  input_directory = os.path.join(data_home, "original", dataset_name)
+  output_directory = os.path.join(data_home, "processed", dataset_name)
   convert_lib.create_dir(output_directory)
   conll_datasets = {}
   for split in convert_lib.DatasetSplit.ALL:
     input_filename = os.path.join(input_directory, "conll12_" + split + ".txt")
     converted_dataset = create_dataset(input_filename)
     convert_lib.write_converted(converted_dataset, output_directory + "/" + split)
+ 
+
+def convert(data_home):
+  convert_subdataset(data_home, convert_lib.DatasetName.conll)
+  convert_subdataset(data_home, convert_lib.DatasetName.conll_sing)

@@ -88,7 +88,7 @@ def doc_add_singletons(document):
         if curr_coref_label == "-":
           sent[i][coref_idx] = singleton_label
         else:
-          sent[i][coref_idx] += singleton_label
+          sent[i][coref_idx] += "|" + singleton_label
 
   return document
 
