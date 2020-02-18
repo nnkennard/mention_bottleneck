@@ -84,32 +84,20 @@ class Document(object):
 
   def dump_to_fpd(self):
     return [" ".join(sentence) for sentence in self.sentences]
+
   def dump_to_jsonl(self):
+
+    nonsingleton_clusters = [
+      cluster for cluster in self.clusters if len(cluster) > 1]
 
     return [json.dumps({
           "doc_key": self.doc_id + "_" + self.doc_part,
           "document_id": self.doc_id + "_" + self.doc_part,
           "sentences": self.sentences,
           "speakers": self.speakers,
-          "clusters": self.clusters + self.singletons,
-          "parse_spans": self.parse_spans,
-          "pos": self.pos,
+          "clusters": nonsingleton_clusters,
+          "candidate_clusters": self.clusters,
         })]
-
-  _unused_stuff = """
-  def _get_conll_coref_labels(self):
-    coref_labels = collections.defaultdict(list)
-    for cluster, tok_idxs in enumerate(self.clusters):
-      for tok_start, tok_end in tok_idxs:
-        if tok_start == tok_end:
-          coref_labels[tok_start].append("({})".format(cluster))
-        else:
-          coref_labels[tok_start].append("({}".format(cluster))
-          coref_labels[tok_end].append("{})".format(cluster))
-
-    return coref_labels
-  """
-
 
 def write_converted(dataset, prefix):
     dataset.dump_to_fpd(prefix + "-fpd/")

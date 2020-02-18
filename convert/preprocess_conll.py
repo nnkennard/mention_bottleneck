@@ -49,12 +49,12 @@ def doc_add_singletons(document):
     Args:
       document: listified document
   """
-  sentence_offset = 0
 
   doc_singletons = set()
   coreferent_entity_nums = set()
   
   for sent_i, sent in enumerate(document[1:-1]):
+    sentence_offset = 0
     sequences = conll_lib.get_sequences(sent)
     coref_map = conll_lib.build_coref_span_map(
                     sequences["COREF"], sentence_offset)

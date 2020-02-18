@@ -33,9 +33,9 @@ def create_dataset(filename):
   list_data = conll_lib.listify_conll_dataset(filename)
 
   document_counter = 0
-  sentence_offset = 0
 
   for doc in list_data:
+    sentence_offset = 0
     doc_coref_map = collections.defaultdict(list)
     doc_parse_map = collections.defaultdict(list)
     begin_line = doc[0][0]
@@ -47,6 +47,7 @@ def create_dataset(filename):
     for sentence in sentences:
       doc_coref_map, doc_parse_map, sentence_offset = add_sentence(
         curr_doc, sentence, doc_coref_map, doc_parse_map, sentence_offset)
+      curr_doc.clusters = list(doc_coref_map.values())
     dataset.documents.append(curr_doc)
     
   return dataset
