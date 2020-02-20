@@ -40,7 +40,7 @@ def create_dataset(filename):
     doc_parse_map = collections.defaultdict(list)
     begin_line = doc[0][0]
     assert begin_line[0] == "#begin"
-    curr_doc_id = begin_line[2][1:-2].replace("/", "-")
+    curr_doc_id = begin_line[2][1:-2]
     curr_doc_part = begin_line[-1]
     curr_doc = convert_lib.Document(curr_doc_id, curr_doc_part)
     sentences = doc[1:-1] # Excluding the #begin and #end lines

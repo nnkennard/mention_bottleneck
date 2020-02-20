@@ -60,7 +60,7 @@ class Dataset(object):
     create_dir(directory)
     for doc in tqdm.tqdm(self.documents):
       with open(
-        directory + "/" + doc.doc_id + "_" + doc.doc_part + ".txt", 'w') as f:
+        directory + "/" + doc.doc_id.replace("/", "-") + "_" + doc.doc_part + ".txt", 'w') as f:
         f.write("\n".join(doc.dump_to_fpd()))
 
 
@@ -91,7 +91,7 @@ class Document(object):
       cluster for cluster in self.clusters if len(cluster) > 1]
 
     return [json.dumps({
-          "doc_key": self.doc_id + "_" + self.doc_part,
+          "doc_key": self.doc_id + "_" + str(int(self.doc_part)),
           "document_id": self.doc_id + "_" + self.doc_part,
           "sentences": self.sentences,
           "speakers": self.speakers,
