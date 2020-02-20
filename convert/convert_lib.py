@@ -13,7 +13,9 @@ class DatasetName(object):
   conll_sing = 'conll_sing'
   preco = 'preco_sing'
   preco_mult = 'preco_mult'
-  ALL_DATASETS = [conll, conll_sing, preco, preco_mult]
+  craft = 'craft_sing'
+  craft_mult = 'craft_mult'
+  ALL_DATASETS = [conll, conll_sing, preco, preco_mult, craft, craft_mult]
 
 
 class DatasetSplit(object):

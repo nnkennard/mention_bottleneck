@@ -9,12 +9,19 @@ class LabelSequences(object):
   COREF = "COREF"
   SPEAKER = "SPEAKER"
 
+NO_SPEAKER = "-"
 
 CONLL_FIELD_MAP = {
   LabelSequences.WORD: 3,
   LabelSequences.POS: 4, 
   LabelSequences.PARSE: 5, 
   LabelSequences.SPEAKER: 9, 
+  LabelSequences.COREF: -1,
+}
+
+CRAFT_FIELD_MAP = {
+  LabelSequences.WORD: 3,
+  LabelSequences.POS: 4, 
   LabelSequences.COREF: -1,
 }
 

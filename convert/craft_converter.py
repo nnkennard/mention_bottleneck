@@ -4,10 +4,9 @@ import collections
 import os
 import re
 
-def add_sentence(curr_doc, curr_sent, doc_coref_map, doc_parse_map,
-                 sentence_offset):
-  sequences = conll_lib.get_sequences(curr_sent, conll_lib.CONLL_FIELD_MAP)
-  curr_doc.speakers.append(sequences[conll_lib.LabelSequences.SPEAKER])
+def add_sentence(curr_doc, curr_sent, doc_coref_map, sentence_offset):
+  sequences = conll_lib.get_sequences(curr_sent, conll_lib.CRAFT_FIELD_MAP)
+  curr_doc.speakers.append([conll_lib.NO_SPEAKER] * len(sequences["WORD"]))
   curr_doc.sentences.append(sequences[conll_lib.LabelSequences.WORD])
   curr_doc.pos.append(sequences[conll_lib.LabelSequences.POS])
 
@@ -15,18 +14,14 @@ def add_sentence(curr_doc, curr_sent, doc_coref_map, doc_parse_map,
       sequences[conll_lib.LabelSequences.COREF], sentence_offset)
   doc_coref_map = conll_lib.ldd_append(doc_coref_map, coref_span_map)
 
-  parse_span_map = conll_lib.build_parse_span_map(
-      sequences[conll_lib.LabelSequences.PARSE], sentence_offset)
-  doc_parse_map = conll_lib.ldd_append(doc_parse_map, parse_span_map)
-  
   sentence_offset += len(sequences[conll_lib.LabelSequences.WORD])
 
   return doc_coref_map, doc_parse_map, sentence_offset
 
 
-def create_dataset(filename, dataset_name):
+def create_dataset(filename, dataset):
  
-  dataset = convert_lib.Dataset(dataset_name)
+  dataset = convert_lib.Dataset(dataset)
 
   list_data = conll_lib.listify_conll_dataset(filename)
 
@@ -58,7 +53,7 @@ def convert_subdataset(data_home, dataset_name):
   conll_datasets = {}
   for split in convert_lib.DatasetSplit.ALL:
     input_filename = os.path.join(input_directory, "conll12_" + split + ".txt")
-    converted_dataset = create_dataset(input_filename, dataset_name)
+    converted_dataset = create_dataset(input_filename)
     convert_lib.write_converted(converted_dataset, output_directory + "/" + split)
  
 
