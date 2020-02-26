@@ -51,6 +51,10 @@ def get_gold_sent(coref_map, unused_parse_map, unused_pos):
 def get_constgold_sent(coref_map, parse_map, unused_pos):
   return set(sum(coref_map.values(), [])).intersection(set(parse_map.keys()))
 
+def get_constvb_sent(coref_map, parse_map, pos):
+  return set(parse_map.keys()).union(set(get_pos_markables(pos)))
+
+
 def get_npvbsing_sent(coref_map, parse_map, pos):
   coreferent_spans = set(sum(coref_map.values(), []))
   parse_markables = [span
@@ -98,6 +102,7 @@ FN_MAP = {
   convert_lib.DatasetName.conll_npsing: get_npsing_sent,
   convert_lib.DatasetName.conll_npvbsing: get_npvbsing_sent,
   convert_lib.DatasetName.conll_const: get_const_sent,
+  convert_lib.DatasetName.conll_constvb: get_constvb_sent,
   convert_lib.DatasetName.conll_constgold: get_constgold_sent,
   convert_lib.DatasetName.conll_gold: get_gold_sent
 }
@@ -135,6 +140,7 @@ def main():
 
   for new_dataset_name in [convert_lib.DatasetName.conll_npsing,
                            convert_lib.DatasetName.conll_const,
+                           convert_lib.DatasetName.conll_constvb,
                            convert_lib.DatasetName.conll_npvbsing,
                            convert_lib.DatasetName.conll_constgold,
                            convert_lib.DatasetName.conll_gold]:

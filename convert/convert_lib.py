@@ -14,6 +14,7 @@ class DatasetName(object):
   conll_npsing = 'conll_npsing'
   conll_npvbsing = 'conll_npvbsing'
   conll_const = 'conll_const'
+  conll_constvb = 'conll_constvb'
   conll_gold = 'conll_gold'
   conll_constgold = 'conll_constgold'
 
