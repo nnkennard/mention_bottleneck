@@ -24,7 +24,7 @@ def conll_add_singletons(dataset, fn):
   """
   new_dataset = []
   for document in dataset:
-    new_dataset.append(doc_apply_labels(document, fn(document))) 
+    new_dataset.append(doc_apply_labels(document, get_doc_labels(document, fn))) 
   return new_dataset
 
 
@@ -42,96 +42,49 @@ def create_additional_labels(new_mentions, cluster_offset, doc_len):
       labels[end] +=  "s" + str(i + cluster_offset) + ")" 
   return labels
 
-def get_npsing_labels(document):
- 
-  doc_singletons = set()
-  coreferent_entity_nums = set()
+def get_const_sent(unused_coref_map, parse_map):
+  return set(parse_map.keys())
 
+def get_gold_sent(coref_map, unused_parse_map):
+  return set(sum(coref_map.values(), []))
+
+def get_npsing_sent(coref_map, parse_map):
+  coreferent_spans = set(sum(coref_map.values(), []))
+  parse_markables = [span
+                        for span, label in parse_map.items()
+                        if re.match(NP_REGEX, label)]
+  return set(parse_markables).union(coreferent_spans)
+
+def get_doc_labels(document, sentence_fn):
+ 
+  new_mentions = set()
   sentence_offset = 0
+  mention_start_index = 0
   
-  for sent_i, sent in enumerate(document[1:-1]):
+  for sent in document[1:-1]:
     sequences = conll_lib.get_sequences(sent)
     coref_map = conll_lib.build_coref_span_map(
                     sequences["COREF"], sentence_offset)
     parse_map = conll_lib.build_parse_span_map(
                     sequences["PARSE"], sentence_offset)
-   
-    coreferent_spans = set(sum(coref_map.values(), []))
-    coreferent_entity_nums.update(int(i) for i in coref_map.keys())
-    singleton_start_index = max(list(coreferent_entity_nums) + [0]) + 1
-
-    parse_markables = [span
-                          for span, label in parse_map.items()
-                          if re.match(NP_REGEX, label)]
- 
-    singletons = set(parse_markables).union(coreferent_spans)
-    doc_singletons.update(list(singletons))
-
-    sentence_offset += len(sequences["WORD"])
-
-  doc_len = sentence_offset
-
-  return create_additional_labels(doc_singletons,
-      singleton_start_index, doc_len)
-
-
-def get_const_labels(document):
-  """TODO: merge with other get labels function (refactor)."""
- 
-  doc_singletons = set()
-  coreferent_entity_nums = set()
-
-  sentence_offset = 0
   
-  for sent_i, sent in enumerate(document[1:-1]):
-    sequences = conll_lib.get_sequences(sent)
-    coref_map = conll_lib.build_coref_span_map(
-                    sequences["COREF"], sentence_offset)
-    parse_map = conll_lib.build_parse_span_map(
-                    sequences["PARSE"], sentence_offset)
-   
-    coreferent_spans = set(sum(coref_map.values(), []))
-    coreferent_entity_nums.update(int(i) for i in coref_map.keys())
-    doc_singletons.update(parse_map.keys())
-
+    additional_mentions = sentence_fn(coref_map, parse_map)
+    new_mentions.update(additional_mentions)
     sentence_offset += len(sequences["WORD"])
-
-  doc_len = sentence_offset
-  singleton_start_index = max(list(coreferent_entity_nums) + [0]) + 1
-  return create_additional_labels(doc_singletons,
-      singleton_start_index, doc_len)
-
-
-def get_gold_labels(document):
-  """TODO: merge with other get labels function (refactor)."""
- 
-  doc_singletons = set()
-  coreferent_entity_nums = set()
-
-  sentence_offset = 0
-  
-  for sent_i, sent in enumerate(document[1:-1]):
-    sequences = conll_lib.get_sequences(sent)
-    coref_map = conll_lib.build_coref_span_map(
-                    sequences["COREF"], sentence_offset)
-   
-    coreferent_spans = set(sum(coref_map.values(), []))
-    coreferent_entity_nums.update(int(i) for i in coref_map.keys())
-    singleton_start_index = max(list(coreferent_entity_nums) + [0]) + 1
-
-    doc_singletons.update(coreferent_spans)
-
-    sentence_offset += len(sequences["WORD"])
+    maybe_mention_start_index = max(list(
+      int(i) for i in coref_map.keys()) + [0]) + 1
+    mention_start_index = max(mention_start_index, maybe_mention_start_index)
 
   doc_len = sentence_offset
 
-  return create_additional_labels(doc_singletons,
-      singleton_start_index, doc_len)
+  return create_additional_labels(new_mentions,
+      mention_start_index, doc_len)
+
 
 FN_MAP = {
-  convert_lib.DatasetName.conll_npsing: get_npsing_labels,
-  convert_lib.DatasetName.conll_const: get_const_labels,
-  convert_lib.DatasetName.conll_gold: get_gold_labels
+  convert_lib.DatasetName.conll_npsing: get_npsing_sent,
+  convert_lib.DatasetName.conll_const: get_const_sent,
+  convert_lib.DatasetName.conll_gold: get_gold_sent
 }
 
 
