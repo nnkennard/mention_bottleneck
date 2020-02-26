@@ -11,11 +11,16 @@ import numpy as np
 class DatasetName(object):
   conll = 'conll_mult' 
   conll_sing = 'conll_sing'
+  conll_npsing = 'conll_npsing'
+  conll_const = 'conll_const'
+  conll_gold = 'conll_gold'
+
   preco = 'preco_sing'
   preco_mult = 'preco_mult'
-  craft = 'craft_sing'
-  craft_mult = 'craft_mult'
-  ALL_DATASETS = [conll, conll_sing, preco, preco_mult, craft, craft_mult]
+
+  ALL_DATASETS = [
+      conll, conll_sing, conll_npsing, conll_const, conll_gold,
+      preco, preco_mult]
 
 
 class DatasetSplit(object):
@@ -78,6 +83,7 @@ class Document(object):
     self.sentences = []
     self.speakers = []
     self.clusters = []
+    self.additional_mentions = []
     self.parse_spans = []
     self.pos = []
     self.singletons = []
@@ -98,7 +104,7 @@ class Document(object):
           "sentences": self.sentences,
           "speakers": self.speakers,
           "clusters": nonsingleton_clusters,
-          "candidate_clusters": self.clusters,
+          "additional_mentions": self.additional_mentions,
         })]
 
 def write_converted(dataset, prefix):

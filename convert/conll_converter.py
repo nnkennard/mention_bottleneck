@@ -45,7 +45,15 @@ def create_dataset(filename, dataset_name):
     for sentence in sentences:
       doc_coref_map, doc_parse_map, sentence_offset = add_sentence(
         curr_doc, sentence, doc_coref_map, doc_parse_map, sentence_offset)
-      curr_doc.clusters = list(doc_coref_map.values())
+
+    true_clusters = [clusters
+        for key, clusters in doc_coref_map.items() if not key.startswith("s")]
+  
+    additional_mentions = sum([clusters
+        for key, clusters in doc_coref_map.items() if key.startswith("s")], [])
+  
+    curr_doc.clusters = true_clusters
+    curr_doc.additional_mentions = additional_mentions
     dataset.documents.append(curr_doc)
     
   return dataset
@@ -63,5 +71,9 @@ def convert_subdataset(data_home, dataset_name):
  
 
 def convert(data_home):
-  convert_subdataset(data_home, convert_lib.DatasetName.conll)
-  convert_subdataset(data_home, convert_lib.DatasetName.conll_sing)
+  for subdataset in [
+      convert_lib.DatasetName.conll,
+      convert_lib.DatasetName.conll_gold,
+      convert_lib.DatasetName.conll_npsing,
+      convert_lib.DatasetName.conll_const]:
+    convert_subdataset(data_home, subdataset)
