@@ -6,7 +6,7 @@ import re
 import sys
 
 NP_REGEX = r"\(NP\**\)"
-POS_MARKABLES = []
+POS_MARKABLES = ["VB", "VBG", "VBN", "VBP", "VBZ"]
 
 
 def get_pos_markables(pos_sequence):
@@ -42,13 +42,26 @@ def create_additional_labels(new_mentions, cluster_offset, doc_len):
       labels[end] +=  "s" + str(i + cluster_offset) + ")" 
   return labels
 
-def get_const_sent(unused_coref_map, parse_map):
+def get_const_sent(unused_coref_map, parse_map, unused_pos):
   return set(parse_map.keys())
 
-def get_gold_sent(coref_map, unused_parse_map):
+def get_gold_sent(coref_map, unused_parse_map, unused_pos):
   return set(sum(coref_map.values(), []))
 
-def get_npsing_sent(coref_map, parse_map):
+def get_constgold_sent(coref_map, parse_map, unused_pos):
+  return set(sum(coref_map.values(), [])).intersection(set(parse_map.keys()))
+
+def get_npvbsing_sent(coref_map, parse_map, pos):
+  coreferent_spans = set(sum(coref_map.values(), []))
+  parse_markables = [span
+                        for span, label in parse_map.items()
+                        if re.match(NP_REGEX, label)]
+  return set(
+             parse_markables).union(
+             coreferent_spans).union(set(get_pos_markables(pos)))
+
+
+def get_npsing_sent(coref_map, parse_map, unused_pos):
   coreferent_spans = set(sum(coref_map.values(), []))
   parse_markables = [span
                         for span, label in parse_map.items()
@@ -68,7 +81,7 @@ def get_doc_labels(document, sentence_fn):
     parse_map = conll_lib.build_parse_span_map(
                     sequences["PARSE"], sentence_offset)
   
-    additional_mentions = sentence_fn(coref_map, parse_map)
+    additional_mentions = sentence_fn(coref_map, parse_map, sequences["POS"])
     new_mentions.update(additional_mentions)
     sentence_offset += len(sequences["WORD"])
     maybe_mention_start_index = max(list(
@@ -83,7 +96,9 @@ def get_doc_labels(document, sentence_fn):
 
 FN_MAP = {
   convert_lib.DatasetName.conll_npsing: get_npsing_sent,
+  convert_lib.DatasetName.conll_npvbsing: get_npvbsing_sent,
   convert_lib.DatasetName.conll_const: get_const_sent,
+  convert_lib.DatasetName.conll_constgold: get_constgold_sent,
   convert_lib.DatasetName.conll_gold: get_gold_sent
 }
 
@@ -120,6 +135,8 @@ def main():
 
   for new_dataset_name in [convert_lib.DatasetName.conll_npsing,
                            convert_lib.DatasetName.conll_const,
+                           convert_lib.DatasetName.conll_npvbsing,
+                           convert_lib.DatasetName.conll_constgold,
                            convert_lib.DatasetName.conll_gold]:
     input_directory = os.path.join(
         data_home, "original", convert_lib.DatasetName.conll)

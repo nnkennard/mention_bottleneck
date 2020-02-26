@@ -12,15 +12,18 @@ class DatasetName(object):
   conll = 'conll_mult' 
   conll_sing = 'conll_sing'
   conll_npsing = 'conll_npsing'
+  conll_npvbsing = 'conll_npvbsing'
   conll_const = 'conll_const'
   conll_gold = 'conll_gold'
+  conll_constgold = 'conll_constgold'
+
 
   preco = 'preco_sing'
   preco_mult = 'preco_mult'
 
-  ALL_DATASETS = [
-      conll, conll_sing, conll_npsing, conll_const, conll_gold,
-      preco, preco_mult]
+  #ALL_DATASETS = [
+  #    conll, conll_sing, conll_npsing, conll_const, conll_gold,
+  #    preco, preco_mult]
 
 
 class DatasetSplit(object):
