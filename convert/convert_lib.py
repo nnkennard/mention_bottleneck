@@ -20,13 +20,11 @@ class DatasetName(object):
   conll_gold = 'conll_gold'
   conll_constgold = 'conll_constgold'
 
+  alternate_conlls = [conll_gold, conll_consttok]
+  all_conlls = [conll] + alternate_conlls
 
   preco = 'preco_sing'
   preco_mult = 'preco_mult'
-
-  #ALL_DATASETS = [
-  #    conll, conll_sing, conll_npsing, conll_const, conll_gold,
-  #    preco, preco_mult]
 
 
 class DatasetSplit(object):

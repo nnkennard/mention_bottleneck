@@ -71,14 +71,5 @@ def convert_subdataset(data_home, dataset_name):
  
 
 def convert(data_home):
-  for subdataset in [
-      convert_lib.DatasetName.conll,
-      convert_lib.DatasetName.conll_gold,
-      convert_lib.DatasetName.conll_constgold,
-      convert_lib.DatasetName.conll_consttok,
-      convert_lib.DatasetName.conll_constvb,
-      convert_lib.DatasetName.conll_npsing,
-      convert_lib.DatasetName.conll_nptoksing,
-      convert_lib.DatasetName.conll_npvbsing,
-      convert_lib.DatasetName.conll_const]:
+  for subdataset in convert_lib.DatasetName.all_conlls:
     convert_subdataset(data_home, subdataset)
