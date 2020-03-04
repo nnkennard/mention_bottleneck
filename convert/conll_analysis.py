@@ -4,6 +4,7 @@ import sys
 
 NONSPAN = "NONSPAN"
 VB_NONSPAN = "VB_NONSPAN"
+TOKEN = "TOKEN"
 
 def main():
   conll_file = sys.argv[1]
@@ -12,6 +13,7 @@ def main():
 
   overall_span_counter = collections.Counter()
   coreferent_span_counter = collections.Counter()
+  token_span_pos_counter = collections.Counter()
 
   for document in list_dataset:
     for sentence in document[1:-1]:
@@ -24,8 +26,12 @@ def main():
 
       nonspans = set(all_coref_spans) - set(parse_spans.keys())
       for start, end in nonspans:
-        if start == end and sequences["POS"][start].startswith("VB"):
-          coreferent_span_counter[VB_NONSPAN] += 1
+        if start == end:
+          if sequences["POS"][start].startswith("VB"):
+            coreferent_span_counter[VB_NONSPAN] += 1
+          else:
+            coreferent_span_counter[TOKEN] += 1
+            token_span_pos_counter[sequences["POS"][start]] += 1
         else:
           coreferent_span_counter[NONSPAN] += 1
 
@@ -36,7 +42,8 @@ def main():
           coreferent_span_counter[condensed_label] += 1 
       
 
-  for d in [overall_span_counter, coreferent_span_counter]:
+  for d in [overall_span_counter,
+            coreferent_span_counter, token_span_pos_counter]:
     for k, v in d.items():
       print(k+"\t"+str(v))
     print()

@@ -6,13 +6,15 @@ import re
 import sys
 
 NP_REGEX = r"\(NP\**\)"
-POS_MARKABLES = ["VB", "VBG", "VBN", "VBP", "VBZ"]
+VB_MARKABLES = ["VB", "VBG", "VBN", "VBP", "VBZ"]
+TOK_MARKABLES = ["PRP$", "NNP", "NN", "CD", "PRP", "NNS", "NNPS", "DT",
+                 "JJ", "CC", "MD"]
 
 
-def get_pos_markables(pos_sequence):
+def get_pos_markables(pos_sequence, markable_list):
   pos_markables = []
   for i, pos in enumerate(pos_sequence):
-    if pos in POS_MARKABLES:
+    if pos in markable_list:
       pos_markables.append((i, i))
   return pos_markables
 
@@ -51,8 +53,13 @@ def get_gold_sent(coref_map, unused_parse_map, unused_pos):
 def get_constgold_sent(coref_map, parse_map, unused_pos):
   return set(sum(coref_map.values(), [])).intersection(set(parse_map.keys()))
 
+def get_consttok_sent(coref_map, parse_map, pos):
+  janky_token_indices = set(sum((list(i) for i in parse_map.keys()), []))
+  token_spans = [(i, i) for i in janky_token_indices]
+  return set(parse_map.keys()).union(set(token_spans))
+
 def get_constvb_sent(coref_map, parse_map, pos):
-  return set(parse_map.keys()).union(set(get_pos_markables(pos)))
+  return set(parse_map.keys()).union(set(get_pos_markables(pos, VB_MARKABLES)))
 
 
 def get_npvbsing_sent(coref_map, parse_map, pos):
@@ -62,7 +69,18 @@ def get_npvbsing_sent(coref_map, parse_map, pos):
                         if re.match(NP_REGEX, label)]
   return set(
              parse_markables).union(
-             coreferent_spans).union(set(get_pos_markables(pos)))
+             coreferent_spans).union(set(get_pos_markables(pos, VB_MARKABLES)))
+
+
+
+def get_nptoksing_sent(coref_map, parse_map, pos):
+  coreferent_spans = set(sum(coref_map.values(), []))
+  parse_markables = [span
+                        for span, label in parse_map.items()
+                        if re.match(NP_REGEX, label)]
+  return set(
+             parse_markables).union(
+             coreferent_spans).union(set(get_pos_markables(pos, TOK_MARKABLES)))
 
 
 def get_npsing_sent(coref_map, parse_map, unused_pos):
@@ -100,9 +118,11 @@ def get_doc_labels(document, sentence_fn):
 
 FN_MAP = {
   convert_lib.DatasetName.conll_npsing: get_npsing_sent,
+  convert_lib.DatasetName.conll_nptoksing: get_nptoksing_sent,
   convert_lib.DatasetName.conll_npvbsing: get_npvbsing_sent,
   convert_lib.DatasetName.conll_const: get_const_sent,
   convert_lib.DatasetName.conll_constvb: get_constvb_sent,
+  convert_lib.DatasetName.conll_consttok: get_consttok_sent,
   convert_lib.DatasetName.conll_constgold: get_constgold_sent,
   convert_lib.DatasetName.conll_gold: get_gold_sent
 }
@@ -140,8 +160,10 @@ def main():
 
   for new_dataset_name in [convert_lib.DatasetName.conll_npsing,
                            convert_lib.DatasetName.conll_const,
+                           convert_lib.DatasetName.conll_consttok,
                            convert_lib.DatasetName.conll_constvb,
                            convert_lib.DatasetName.conll_npvbsing,
+                           convert_lib.DatasetName.conll_nptoksing,
                            convert_lib.DatasetName.conll_constgold,
                            convert_lib.DatasetName.conll_gold]:
     input_directory = os.path.join(
