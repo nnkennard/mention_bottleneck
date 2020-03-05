@@ -1,8 +1,10 @@
 import os
 import json
-import convert_lib
 import random
 import tqdm
+
+import convert_lib
+import preco_lib
 
 PRECO = convert_lib.DatasetName.preco
 PRECO_MULT = convert_lib.DatasetName.preco_mult
@@ -84,5 +86,6 @@ def convert_subdataset(data_home, dataset_name):
     preco_datasets[split] = converted_dataset
  
 def convert(data_home):
+  preco_lib.convert(data_home)
   convert_subdataset(data_home, convert_lib.DatasetName.preco)
   convert_subdataset(data_home, convert_lib.DatasetName.preco_mult)

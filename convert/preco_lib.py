@@ -24,8 +24,7 @@ def remove_singletons(records):
   return new_records
   
 
-def main():
-  data_dir = sys.argv[1]
+def preprocess(data_dir):
 
   preco_orig_dir = os.path.join(data_dir, "original", "PreCo_1.0")
   preco_dir = os.path.join(data_dir, "original", "preco_sing")
@@ -61,6 +60,3 @@ def main():
     with open(os.path.join(preco_mult_dir, split_name + ".jsonl"), 'w') as f:
       f.write("\n".join(no_singleton_records))
   
-
-if __name__ == "__main__":
-  main()
