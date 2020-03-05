@@ -1,4 +1,5 @@
 import conll_lib
+import convert_lib
 
 NP_REGEX = r"\(NP\**\)"
 VB_MARKABLES = ["VB", "VBG", "VBN", "VBP", "VBZ"]

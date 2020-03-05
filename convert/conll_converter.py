@@ -65,15 +65,16 @@ def create_alternate_subdataset(data_home, original_dataset, new_dataset):
       data_home, "original", original_dataset)
   output_directory = os.path.join(data_home, "original", new_dataset)
   convert_lib.create_dir(output_directory)
+    
+  fn = conll_alternates.FN_MAP[new_dataset]
 
   for split in convert_lib.DatasetSplit.ALL:
     input_filename = os.path.join(input_directory, "conll12_" + split + ".txt")
     output_filename = os.path.join(
                           output_directory, "conll12_" + split + ".txt")
     dataset = conll_lib.listify_conll_dataset(input_filename)
-    fn = conll_alternates.FN_MAP[new_dataset_name]
-    new_dataset = conll_alternates.conll_add_singletons(dataset, fn)
-    conll_alternates.write_conll_to_file(new_dataset, output_filename) 
+    converted_dataset = conll_alternates.conll_add_singletons(dataset, fn)
+    conll_alternates.write_conll_to_file(converted_dataset, output_filename) 
 
 
 def convert_subdataset(data_home, dataset_name):
