@@ -23,7 +23,7 @@ def add_sentence(curr_doc, curr_sent, doc_coref_map, doc_parse_map,
   
   sentence_offset += len(sequences[conll_lib.LabelSequences.WORD])
 
-  return doc_coref_map, doc_parse_map, sentence_offset
+  return doc_coref_map, doc_parse_map, sentence_offset, sequences["POS"]
 
 
 def create_dataset(filename, dataset_name):
@@ -38,6 +38,7 @@ def create_dataset(filename, dataset_name):
     sentence_offset = 0
     doc_coref_map = collections.defaultdict(list)
     doc_parse_map = collections.defaultdict(list)
+    pos_sequences = []
     begin_line = doc[0][0]
     assert begin_line[0] == "#begin"
     curr_doc_id = begin_line[2][1:-2]
@@ -45,14 +46,17 @@ def create_dataset(filename, dataset_name):
     curr_doc = convert_lib.Document(curr_doc_id, curr_doc_part)
     sentences = doc[1:-1] # Excluding the #begin and #end lines
     for sentence in sentences:
-      doc_coref_map, doc_parse_map, sentence_offset = add_sentence(
+      doc_coref_map, doc_parse_map, sentence_offset, pos_seq = add_sentence(
         curr_doc, sentence, doc_coref_map, doc_parse_map, sentence_offset)
+      pos_sequences.append(pos_seq)
 
     true_clusters = [clusters
         for key, clusters in doc_coref_map.items() if not key.startswith("s")]
   
     additional_mentions = sum([clusters
         for key, clusters in doc_coref_map.items() if key.startswith("s")], [])
+
+    curr_doc.parse_map = [(k, v) for k, v in doc_coref_map.items()]
   
     curr_doc.clusters = true_clusters
     curr_doc.additional_mentions = additional_mentions

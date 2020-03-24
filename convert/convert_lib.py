@@ -10,17 +10,18 @@ import numpy as np
 
 class DatasetName(object):
   conll = 'conll_mult' 
+  conll_gold = 'conll_gold'
+  conll_consttok = 'conll_consttok'
+
   conll_sing = 'conll_sing'
   conll_npsing = 'conll_npsing'
   conll_nptoksing = 'conll_nptoksing'
   conll_npvbsing = 'conll_npvbsing'
   conll_const = 'conll_const'
-  conll_consttok = 'conll_consttok'
   conll_constvb = 'conll_constvb'
-  conll_gold = 'conll_gold'
   conll_constgold = 'conll_constgold'
 
-  alternate_conlls = [conll_gold, conll_consttok]
+  alternate_conlls = [conll_gold, conll_consttok, conll_nptoksing]
   all_conlls = [conll] + alternate_conlls
 
   preco = 'preco_sing'
@@ -108,7 +109,9 @@ class Document(object):
           "sentences": self.sentences,
           "speakers": self.speakers,
           "clusters": nonsingleton_clusters,
-          "additional_mentions": self.additional_mentions,
+          "inject_mentions": self.additional_mentions,
+          "parse_spans": self.parse_spans,
+          "pos": self.pos
         })]
 
 def write_converted(dataset, prefix):

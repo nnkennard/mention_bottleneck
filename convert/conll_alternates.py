@@ -1,6 +1,8 @@
 import conll_lib
 import convert_lib
 
+import re
+
 NP_REGEX = r"\(NP\**\)"
 VB_MARKABLES = ["VB", "VBG", "VBN", "VBP", "VBZ"]
 TOK_MARKABLES = ["PRP$", "NNP", "NN", "CD", "PRP", "NNS", "NNPS", "DT",
@@ -87,15 +89,16 @@ def conll_add_singletons(dataset, fn):
 def create_additional_labels(new_mentions, cluster_offset, doc_len):
   labels = ["" for _ in range(doc_len)]
   for i , (start, end) in enumerate(sorted(new_mentions)):
+    cluster_id = "s" + str(i + cluster_offset)
     if labels[start]:
       labels[start] += "|"
     if start == end:
-      labels[start] += "(s" + str(i + cluster_offset) + ")"
+      labels[start] += "({0})".format(cluster_id)
     else:
-      labels[start] += "(s"+ str(i + cluster_offset) 
+      labels[start] += "({0}".format(cluster_id)
       if labels[end]:
         labels[end] += "|"
-      labels[end] +=  "s" + str(i + cluster_offset) + ")" 
+      labels[end] += "{0})".format(cluster_id)
   return labels
 
 def get_doc_labels(document, sentence_fn):
