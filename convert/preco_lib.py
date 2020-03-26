@@ -15,7 +15,7 @@ def get_records_from_preco_file(filename):
 def preprocess(data_dir):
 
   preco_orig_dir = os.path.join(data_dir, "original", "PreCo_1.0")
-  preco_dir = os.path.join(data_dir, "original", "preco_goldsing")
+  preco_dir = os.path.join(data_dir, "original", "preco")
   
   convert_lib.create_dir(preco_dir)
 

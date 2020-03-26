@@ -6,8 +6,6 @@ import tqdm
 import convert_lib
 import preco_lib
 
-PRECO = convert_lib.DatasetName.preco
-PRECO_MULT = convert_lib.DatasetName.preco_mult
 DUMMY_DOC_PART = '0'
 
 def get_lines_from_file(filename):
@@ -45,13 +43,13 @@ def make_empty_speakers(sentences):
   return [["" for token in sent] for sent in sentences]
 
 def create_dataset(filename):
-  dataset = convert_lib.Dataset(PRECO)
+  dataset = convert_lib.Dataset(convert_lib.DatasetName.preco)
   lines = get_lines_from_file(filename)
 
   for line in tqdm.tqdm(lines):
     orig_document = json.loads(line)
     new_document = convert_lib.Document(
-        convert_lib.make_doc_id(PRECO, orig_document["id"]), DUMMY_DOC_PART)
+        convert_lib.make_doc_id("preco", orig_document["id"]), DUMMY_DOC_PART)
     sentence_offsets = []
     token_count = 0
   
@@ -79,8 +77,7 @@ def convert_subdataset(data_home, dataset_name):
   preco_datasets = {}
   for split in [convert_lib.DatasetSplit.train, convert_lib.DatasetSplit.dev,
     convert_lib.DatasetSplit.test]:
-    input_filename = os.path.join(input_directory, split + "." +
-        convert_lib.FormatName.jsonl)
+    input_filename = os.path.join(input_directory, split + ".jsonl")
     converted_dataset = create_dataset(input_filename)
     convert_lib.write_converted(converted_dataset, output_directory + "/" + split)
     preco_datasets[split] = converted_dataset
@@ -97,22 +94,41 @@ def get_gold_injected(example):
   return sum(
     [cluster for cluster in example["clusters"] if len(cluster) > 1], [])
 
+def get_goldsing_injected(example):
+  return []
+
+def get_classic_injected(example):
+  return []
+
 FN_MAP = {
   "sing": get_sing_injected,
-  "gold": get_gold_injected
+  "gold": get_gold_injected,
+  "goldsing": get_goldsing_injected,
+  "classic": get_classic_injected
 }
 
-def create_injected_file(classic_filename, inject_type):
-  examples = get_examples(classic_filename)
+def keep_singletons(inject_type):
+  return inject_type == "goldsing"
+
+def create_injected_file(superset_filename, inject_type):
+  examples = get_examples(superset_filename)
   for example in examples:
     example["injected_mentions"] = FN_MAP[inject_type](example)
-  out_file = classic_filename.replace("classic", inject_type)
+    if not keep_singletons(inject_type):
+      clusters = [cluster for cluster in example["clusters"] if len(cluster) >1]
+      example["clusters"] = clusters
+      
+  out_file = superset_filename.replace("preco", "preco/" + inject_type)
   with open(out_file, 'w') as f:
-    f.write("\n".join(examples))
+    f.write("\n".join(json.dumps(example) for example in examples))
 
 
 def convert(data_home):
   preco_lib.preprocess(data_home)
-  convert_subdataset(data_home, convert_lib.DatasetName.preco)
-  for new_type in FN_MAP.keys():
-    create_injected_file(goldsing_filename, new_type)
+  convert_subdataset(data_home, "preco")
+  superset_dir = os.path.join(data_home, "processed", "preco")
+  for subset in ["train", "dev", "test"]:
+    superset_filename = superset_dir + "/" + subset + ".jsonl"
+    for new_type in FN_MAP.keys():
+      convert_lib.create_dir(superset_dir + "/" + new_type)
+      create_injected_file(superset_filename, new_type)

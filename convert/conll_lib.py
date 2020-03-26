@@ -35,7 +35,6 @@ def get_sequences(sentence, field_map=CONLL_FIELD_MAP):
   return sequences
 
 
-
 def listify_conll_dataset(filename):
 
   dataset = []
@@ -67,6 +66,7 @@ def listify_conll_dataset(filename):
 
   return dataset
 
+
 def build_coref_span_map(coref_col, offset=0):
   span_starts = collections.defaultdict(list)
   complete_spans = []
@@ -95,6 +95,7 @@ def build_coref_span_map(coref_col, offset=0):
     span_dict[cluster].append((offset + start, offset + end))
     # offset is the token offset of the sentence within the document
   return span_dict
+
 
 def split_parse_label(label):
   curr_chunk = ""

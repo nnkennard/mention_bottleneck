@@ -3,24 +3,33 @@ import convert_lib
 
 import re
 
+NP_REGEX = r"\(NP\**\)"
+
+def get_token_spans(parse_map):
+  janky_token_indices = set(sum((list(i) for i in parse_map.keys()), []))
+  return [(i, i) for i in janky_token_indices]
+
 # Begin alternate conll functions
+
+def get_classic_sent(unused_coref_map, unused_parse_map, unused_pos):
+  return set()
 
 def get_gold_sent(coref_map, unused_parse_map, unused_pos):
   return set(sum(coref_map.values(), []))
 
-def get_goldconst_sent(coref_map, parse_map, pos):
-  janky_token_indices = set(sum((list(i) for i in parse_map.keys()), []))
-  token_spans = [(i, i) for i in janky_token_indices]
+def get_goldconst_sent(unused_coref_map, parse_map, unused_pos):
+  token_spans = get_token_spans(parse_map)
   return set(parse_map.keys()).union(set(token_spans))
 
 def get_sing_sent(coref_map, parse_map, pos):
   coreferent_spans = set(sum(coref_map.values(), []))
+  token_spans = get_token_spans(parse_map)
   parse_markables = [span
                         for span, label in parse_map.items()
                         if re.match(NP_REGEX, label)]
   return set(
              parse_markables).union(
-             coreferent_spans).union(set(get_pos_markables(pos, TOK_MARKABLES)))
+             coreferent_spans).union(set(token_spans))
 
 def get_npsing_sent(coref_map, parse_map, unused_pos):
   coreferent_spans = set(sum(coref_map.values(), []))
@@ -30,9 +39,10 @@ def get_npsing_sent(coref_map, parse_map, unused_pos):
   return set(parse_markables).union(coreferent_spans)
 
 FN_MAP = {
-  convert_lib.DatasetName.sing: get_sing_sent,
-  convert_lib.DatasetName.gold: get_gold_sent,
-  convert_lib.DatasetName.goldconst: get_goldconst_sent,
+  convert_lib.Variation.classic: get_classic_sent,
+  convert_lib.Variation.sing: get_sing_sent,
+  convert_lib.Variation.gold: get_gold_sent,
+  convert_lib.Variation.goldconst: get_goldconst_sent,
   }
 
 # End alternate conll functions
