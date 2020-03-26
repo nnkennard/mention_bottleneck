@@ -9,24 +9,11 @@ import numpy as np
 
 
 class DatasetName(object):
-  conll = 'conll_mult' 
-  conll_gold = 'conll_gold'
-  conll_consttok = 'conll_consttok'
-
-  conll_sing = 'conll_sing'
-  conll_npsing = 'conll_npsing'
-  conll_nptoksing = 'conll_nptoksing'
-  conll_npvbsing = 'conll_npvbsing'
-  conll_const = 'conll_const'
-  conll_constvb = 'conll_constvb'
-  conll_constgold = 'conll_constgold'
-
-  alternate_conlls = [conll_gold, conll_consttok, conll_nptoksing]
-  all_conlls = [conll] + alternate_conlls
-
-  preco = 'preco_sing'
-  preco_mult = 'preco_mult'
-
+  classic = 'classic'
+  sing = 'sing'
+  gold = 'gold'
+  goldconst = 'goldconst'
+  predconst = 'predconst'
 
 class DatasetSplit(object):
   train = 'train'

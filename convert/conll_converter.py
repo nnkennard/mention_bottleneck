@@ -93,9 +93,17 @@ def convert_subdataset(data_home, dataset_name):
  
 
 def convert(data_home):
-  for subdataset in convert_lib.DatasetName.alternate_conlls:
+  alternate_subdatasets = [
+    convert_lib.DatasetName.sing,
+    convert_lib.DatasetName.gold,
+    convert_lib.DatasetName.goldconst,
+    ]
+
+  for subdataset in alternate_subdatasets:
     create_alternate_subdataset(
         data_home, convert_lib.DatasetName.conll, subdataset)
+
+  all_conlls = alternate_subdatasets + [convert_lib.DatasetName.classic]
       
   for subdataset in convert_lib.DatasetName.all_conlls:
     convert_subdataset(data_home, subdataset)

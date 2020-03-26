@@ -85,7 +85,34 @@ def convert_subdataset(data_home, dataset_name):
     convert_lib.write_converted(converted_dataset, output_directory + "/" + split)
     preco_datasets[split] = converted_dataset
  
+
+def get_examples(filename):
+  with open(filename, 'r') as f:
+    return [json.loads(line) for line in f.readlines()]
+
+def get_sing_injected(example):
+  return sum(example["clusters"], [])
+
+def get_gold_injected(example):
+  return sum(
+    [cluster for cluster in example["clusters"] if len(cluster) > 1], [])
+
+FN_MAP = {
+  "sing": get_sing_injected,
+  "gold": get_gold_injected
+}
+
+def create_injected_file(classic_filename, inject_type):
+  examples = get_examples(classic_filename)
+  for example in examples:
+    example["injected_mentions"] = FN_MAP[inject_type](example)
+  out_file = classic_filename.replace("classic", inject_type)
+  with open(out_file, 'w') as f:
+    f.write("\n".join(examples))
+
+
 def convert(data_home):
   preco_lib.preprocess(data_home)
   convert_subdataset(data_home, convert_lib.DatasetName.preco)
-  convert_subdataset(data_home, convert_lib.DatasetName.preco_mult)
+  for new_type in FN_MAP.keys():
+    create_injected_file(goldsing_filename, new_type)
