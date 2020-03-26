@@ -84,7 +84,7 @@ def create_alternate_subdataset(data_home, original_dataset, new_dataset):
 
 def convert_subdataset(data_home, dataset_name):
   input_directory = os.path.join(data_home, "original/conll_alternates", dataset_name)
-  output_directory = os.path.join(data_home, "processed", dataset_name)
+  output_directory = os.path.join(data_home, "processed/conll", dataset_name)
   convert_lib.create_dir(output_directory)
   conll_datasets = {}
   for split in convert_lib.DatasetSplit.ALL:
@@ -94,6 +94,7 @@ def convert_subdataset(data_home, dataset_name):
  
 
 def convert(data_home):
+  """This just creates the alternate conlls, then converts everything."""
   alternate_subdatasets = [convert_lib.Variation.classic,
     convert_lib.Variation.sing, convert_lib.Variation.gold,
     convert_lib.Variation.goldconst]

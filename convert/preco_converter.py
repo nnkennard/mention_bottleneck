@@ -70,17 +70,15 @@ def create_dataset(filename):
 
   return dataset
 
-def convert_subdataset(data_home, dataset_name):
-  input_directory = os.path.join(data_home, "original", dataset_name)
-  output_directory = os.path.join(data_home, "processed", dataset_name)
+def convert_format(data_home):
+  input_directory = os.path.join(data_home, "original", "preco")
+  output_directory = os.path.join(data_home, "processed", "preco/all_info")
   convert_lib.create_dir(output_directory)
-  preco_datasets = {}
   for split in [convert_lib.DatasetSplit.train, convert_lib.DatasetSplit.dev,
     convert_lib.DatasetSplit.test]:
     input_filename = os.path.join(input_directory, split + ".jsonl")
     converted_dataset = create_dataset(input_filename)
     convert_lib.write_converted(converted_dataset, output_directory + "/" + split)
-    preco_datasets[split] = converted_dataset
  
 
 def get_examples(filename):
@@ -118,17 +116,18 @@ def create_injected_file(superset_filename, inject_type):
       clusters = [cluster for cluster in example["clusters"] if len(cluster) >1]
       example["clusters"] = clusters
       
-  out_file = superset_filename.replace("preco", "preco/" + inject_type)
+  out_file = superset_filename.replace("all_info", inject_type)
+  convert_lib.create_dir("/".join(out_file.split("/")[:-1]))
   with open(out_file, 'w') as f:
     f.write("\n".join(json.dumps(example) for example in examples))
 
 
 def convert(data_home):
   preco_lib.preprocess(data_home)
-  convert_subdataset(data_home, "preco")
-  superset_dir = os.path.join(data_home, "processed", "preco")
+  convert_format(data_home)
+  superset_dir = os.path.join(data_home, "processed", "preco/all_info")
   for subset in ["train", "dev", "test"]:
-    superset_filename = superset_dir + "/" + subset + ".jsonl"
+    all_info_filename = superset_dir + "/" + subset + ".jsonl"
     for new_type in FN_MAP.keys():
       convert_lib.create_dir(superset_dir + "/" + new_type)
-      create_injected_file(superset_filename, new_type)
+      create_injected_file(all_info_filename, new_type)
