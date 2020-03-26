@@ -1,14 +1,12 @@
-import tqdm
-import json
-
-import collections
-import csv
 import json
 import os
-import numpy as np
 
 
 class DatasetName(object):
+  conll = 'conll'
+  preco = 'preco'
+
+class Variation(object):
   classic = 'classic'
   sing = 'sing'
   gold = 'gold'
@@ -22,11 +20,6 @@ class DatasetSplit(object):
   ALL = [train, dev, test]
 
 
-class FormatName(object):
-  jsonl = 'jsonl'
-  file_per_doc = 'file_per_doc'
-  ALL_FORMATS = [jsonl, file_per_doc]
-
 def create_dir(path):
   try:
       os.makedirs(path)
@@ -34,6 +27,7 @@ def create_dir(path):
       print ("Creation of the directory %s failed" % path)
   else:
       print ("Successfully created the directory %s " % path)
+
 
 def make_doc_id(dataset, doc_name):
   if dataset.startswith('preco'):
@@ -55,17 +49,6 @@ class Dataset(object):
     with open(file_name, 'w') as f:
       f.write("\n".join(lines))
 
-  def dump_to_fpd(self, directory):
-    create_dir(directory)
-    for doc in tqdm.tqdm(self.documents):
-      with open(
-        directory + "/" + doc.doc_id.replace("/", "-") + "_" + doc.doc_part + ".txt", 'w') as f:
-        f.write("\n".join(doc.dump_to_fpd()))
-
-
-def flatten(l):
-  return sum(l, [])
-
 
 class Document(object):
   def __init__(self, doc_id, doc_part):
@@ -75,15 +58,10 @@ class Document(object):
     self.sentences = []
     self.speakers = []
     self.clusters = []
-    self.additional_mentions = []
+    self.injected_mentions = []
     self.parse_spans = []
     self.pos = []
     self.singletons = []
-
-    self.label_sequences = {}
-
-  def dump_to_fpd(self):
-    return [" ".join(sentence) for sentence in self.sentences]
 
   def dump_to_jsonl(self):
 
@@ -96,11 +74,10 @@ class Document(object):
           "sentences": self.sentences,
           "speakers": self.speakers,
           "clusters": nonsingleton_clusters,
-          "inject_mentions": self.additional_mentions,
+          "inject_mentions": self.injected_mentions,
           "parse_spans": self.parse_spans,
           "pos": self.pos
         })]
 
 def write_converted(dataset, prefix):
-    dataset.dump_to_fpd(prefix + "-fpd/")
-    dataset.dump_to_jsonl(prefix + ".jsonl")
+  dataset.dump_to_jsonl(prefix + ".jsonl")
