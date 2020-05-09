@@ -1,4 +1,5 @@
 import collections
+import json
 import os
 
 import conll_alternates
@@ -11,7 +12,7 @@ def add_sentence(curr_doc, curr_sent, doc_coref_map, doc_parse_map,
   sequences = conll_lib.get_sequences(curr_sent, conll_lib.CONLL_FIELD_MAP)
   curr_doc.speakers.append(sequences[conll_lib.LabelSequences.SPEAKER])
   curr_doc.sentences.append(sequences[conll_lib.LabelSequences.WORD])
-  curr_doc.pos.append(sequences[conll_lib.LabelSequences.POS])
+  #curr_doc.pos.append(sequences[conll_lib.LabelSequences.POS])
 
   coref_span_map = conll_lib.build_coref_span_map(
       sequences[conll_lib.LabelSequences.COREF], sentence_offset)
@@ -23,7 +24,7 @@ def add_sentence(curr_doc, curr_sent, doc_coref_map, doc_parse_map,
   
   sentence_offset += len(sequences[conll_lib.LabelSequences.WORD])
 
-  return doc_coref_map, doc_parse_map, sentence_offset, sequences["POS"]
+  return doc_coref_map, doc_parse_map, sentence_offset#, sequences["POS"]
 
 
 def create_dataset(filename, dataset_name):
@@ -39,16 +40,21 @@ def create_dataset(filename, dataset_name):
     doc_coref_map = collections.defaultdict(list)
     doc_parse_map = collections.defaultdict(list)
     pos_sequences = []
+
+    # Get document metadata from begin line
     begin_line = doc[0][0]
     assert begin_line[0] == "#begin"
     curr_doc_id = begin_line[2][1:-2]
     curr_doc_part = begin_line[-1]
-    curr_doc = convert_lib.Document(curr_doc_id, curr_doc_part)
+
+    curr_doc = convert_lib.CorefDocument(
+        curr_doc_id, curr_doc_part, convert_lib.ProcessingStage.TOKENIZED)
+
     sentences = doc[1:-1] # Excluding the #begin and #end lines
     for sentence in sentences:
-      doc_coref_map, doc_parse_map, sentence_offset, pos_seq = add_sentence(
+      doc_coref_map, doc_parse_map, sentence_offset = add_sentence(
         curr_doc, sentence, doc_coref_map, doc_parse_map, sentence_offset)
-      pos_sequences.append(pos_seq)
+      #pos_sequences.append(pos_seq)
 
     true_clusters = [clusters
         for key, clusters in doc_coref_map.items() if not key.startswith("s")]
@@ -56,11 +62,12 @@ def create_dataset(filename, dataset_name):
     additional_mentions = sum([clusters
         for key, clusters in doc_coref_map.items() if key.startswith("s")], [])
 
-    curr_doc.parse_map = [(k, v) for k, v in doc_coref_map.items()]
+    other_info = {"parse_map": [(k, v) for k, v in doc_coref_map.items()]}
+    curr_doc.other_info_json = json.dumps(other_info)
   
     curr_doc.clusters = true_clusters
     curr_doc.additional_mentions = additional_mentions
-    dataset.documents.append(curr_doc)
+    dataset.documents[convert_lib.ProcessingStage.TOKENIZED].append(curr_doc)
     
   return dataset
 
