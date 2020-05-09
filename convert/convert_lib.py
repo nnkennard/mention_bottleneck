@@ -215,6 +215,10 @@ def segment_document(bpe_document, new_stage):
     else:
       current_segment += sentence
       current_speakers += speakers
+  
+
+  print(len(subtoken_offsets))
+  print(subtoken_offsets)
 
 
   #flat_sent = flatten(self.tokenized_sentences)
