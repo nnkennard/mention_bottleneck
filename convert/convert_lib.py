@@ -53,29 +53,73 @@ class Dataset(object):
 
   def dump_to_jsonl(self, file_name):
     assert file_name.endswith(".jsonl")
-    lines = []
-    for doc in self.documents:
-      lines += doc.dump_to_jsonl()
-    with open(file_name, 'w') as f:
-      f.write("\n".join(lines))
+    for max_segment_len in [384, 512]:
+      seg_filename =  file_name.replace(
+          ".jsonl", "_" + str(max_segment_len) + ".jsonl")
+      lines = []
+      for doc in self.documents:
+        lines += doc.dump_to_jsonl(max_segment_len)
+      with open(seg_filename, 'w') as f:
+        f.write("\n".join(lines))
 
 
 def flatten(nonflat):
   return sum(nonflat,[])
 
+
+class ProcessingStage(object):
+  UNINITIALIZED = 0
+  TOKENIZED = 1
+  BPE_TOKENIZED = 2
+  SEGMENTED_384 = 3
+  SEGMENTED_512 = 4
+
+
+class CorefDocument(object):
+  def __init__(self, doc_id, part,
+      initial_status=ProcessingStage.UNINITIALIZED):
+
+    self.doc_id = doc_id
+    self.doc_part = part
+    self.status=initial_status
+
+    self.clusters = None
+    self.injected_mentions = None
+    self.sentences = None
+    self.speakers = None
+
+    self.other_info_json = None
+
+    
+
+def bpe_tokenize_document(document, tokenizer):
+  assert document.status == ProcessingStage.TOKENIZED
+
+  pass
+  
+  document.status = ProcessingStage.BPE_TOKENIZED
+
+def segment_document(document, max_segment_len):
+  assert document.status == BPE_TOKENIZED
+  segmented_document = CorefDocument(
+      document.doc_id, document.doc_part, ProcessingStage.UNINITIALIZED)
+
+  return segmented_document
+    
+
+    
 class Document(object):
   def __init__(self, doc_id, doc_part):
-    self.doc_id = doc_id
-    self.doc_part = doc_part
+    #self.doc_id = doc_id
+    #self.doc_part = doc_part
     self.sentences = []
     self.speakers = []
-    self.clusters = []
+    self.clusters = {}
     self.injected_mentions = []
     self.parse_spans = []
     self.pos = []
     self.singletons = []
     
-    self.token_sentences = None
     self.bertified = False
 
   def bertify(self):
@@ -84,7 +128,7 @@ class Document(object):
 
     # BERT-tokenized sentences
     self.token_sentences = self.sentences
-    self.sentences = []
+    self.tokenized_sentences = []
     
     # Map from subword to sentence index
     self.sentence_map = []
@@ -122,15 +166,14 @@ class Document(object):
       flattened_subword = sum(subword_list, [])
 
       # Build various fields
-      self.sentences.append([CLS] + flattened_subword + [SEP])
-      self.sentence_map += [sentence_idx] * (len(flattened_subword) + 2)  # fix this
-      self.subtoken_map += ([previous_token]
-                            + subword_to_word + [subword_to_word[-1]])
-      self.speakers.append([SPL] + [speaker] * len(flattened_subword) + [SPL])
+      self.tokenized_sentences.append(flattened_subword)
+      self.sentence_map += [sentence_idx] * len(flattened_subword)  # fix this
+      self.subtoken_map += subword_to_word
+      self.speakers.append([speaker] * len(flattened_subword))
 
-      previous_token = subword_to_word[-1]
       cum_doc_token_count += len(sentence)
 
+    flat_subtokens = flatten(self.sentences)
     # Remap clusters
     self.token_clusters = self.clusters
     self.clusters = []
@@ -140,16 +183,67 @@ class Document(object):
         new_start = token_to_starting_subtoken[start]
         new_end = token_to_ending_subtoken[end]
         new_cluster.append([new_start, new_end])
+        #print("((", flat_subtokens[start:end+1])
+      
       self.clusters.append(new_cluster)
-    
+
                        
     self.bertified = True
+    self.segmentize(384)
+
+  def segmentize(self, segment_len):
+    subtoken_offsets = []
+    current_segment = []
+    doc_segments = []
+    doc_speakers = []
+    current_speakers = []
+    subtoken_offset = -1
+    assert self.bertified
+    for i, (sentence, speakers) in enumerate(zip(self.tokenized_sentences, self.speakers)):
+      curr_sent_len = len(sentence)
+      if len(current_segment) + curr_sent_len + 2 >= segment_len or i == len(self.sentences) - 1:
+        # A segment is complete, put it away and update the subtoken remap
+        doc_segments.append([CLS] + current_segment + [SEP])
+        doc_speakers.append([SPL] + current_speakers + [SPL])
+        subtoken_offset += 1 # for the CLS
+        subtoken_offsets += [subtoken_offset] * len(current_segment)
+        subtoken_offset += 1 # for the SEP
+        
+        current_segment = sentence
+        current_speakers = speakers
+      else:
+        current_segment += sentence
+        current_speakers += speakers
+  
+    flat_sent = flatten(self.tokenized_sentences)
+    for i, k in enumerate(doc_segments):
+      print("%%", i, len(k), k)
+    flat_seg = flatten(doc_segments)
+    seg_clusters = []
+    for cluster in self.clusters:
+      new_cluster = []
+      for start, end in cluster:
+        print("^^", flat_sent[start-1:end])
+        print(start, end)
+        new_start, new_end = start + subtoken_offsets[start], end + subtoken_offsets[end]
+        new_cluster.append([new_start, new_end])
+        print("***", flat_seg[new_start:new_end+1])
+        #print("---", flat_sent[start:end+1])
+      print()
+      seg_clusters.append(new_cluster)
+
+    exit()
    
 
-  def dump_to_jsonl(self):
+  def dump_to_jsonl(self, segment_len):
 
     if not self.bertified:
       self.bertify()
+
+    all_subtokens = flatten(self.sentences)
+    segments = []
+    for i in range(0, len(all_subtokens), segment_len):
+      segments.append(all_subtokens[i:i+segment_len])
 
     nonsingleton_clusters = [
       cluster for cluster in self.clusters if len(cluster) > 1]
@@ -157,7 +251,7 @@ class Document(object):
     return [json.dumps({
           "doc_key": self.doc_id + "_" + str(int(self.doc_part)),
           "document_id": self.doc_id + "_" + self.doc_part,
-          "sentences": self.sentences,
+          "sentences": segments,
           "sentence_map": self.sentence_map,
           "subtoken_map": self.subtoken_map,
           #"token_sentences": self.token_sentences,
