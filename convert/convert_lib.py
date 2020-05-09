@@ -145,7 +145,7 @@ def bpe_tokenize_document(document, tokenizer):
     subword_list = [TOKENIZER.tokenize(token) for token in sentence]
 
     # Construct mapping to subtoken for use in cluster stuff later
-    subtoken_offset = len(bpe_document.subtoken_map) + 1 # +1 for the CLS
+    subtoken_offset = len(bpe_document.subtoken_map) # +1 for the CLS
     for i, (token, subwords) in enumerate(zip(sentence, subword_list)):
       token_to_starting_subtoken.append(subtoken_offset)
       subtoken_offset += len(subwords)
@@ -171,11 +171,20 @@ def bpe_tokenize_document(document, tokenizer):
            
 
   # Remap clusters
+  
+  flat_tok = flatten(document.sentences)
+  flat_bpe = flatten(bpe_document.sentences)
+
+  #for i, tok in enumerate(flat_bpe):
+  #  print(i, tok)
+
   for cluster in document.clusters:
     new_cluster = []
     for start, end in cluster:
-      new_start = token_to_starting_subtoken[start]
+      #print("tok_doc ", start, end, flat_tok[start:end+1])
+      new_start = token_to_starting_subtoken[start] 
       new_end = token_to_ending_subtoken[end]
+      #print("bpe_doc ", new_start, new_end, flat_bpe[new_start:new_end+1])
       new_cluster.append([new_start, new_end])
     bpe_document.clusters.append(new_cluster)
   
@@ -191,58 +200,46 @@ def segment_document(bpe_document, new_stage):
   seg_document = CorefDocument(
       bpe_document.doc_id, bpe_document.doc_part, new_stage)
 
-  subtoken_offsets = []
+  segment_maps = []
   current_segment = []
-  #doc_segments = []
-  #doc_speakers = []
-  current_speakers = []
-  subtoken_offset = -1
+  current_segment_len = 0
 
-  for i, (sentence, speakers) in enumerate(
-    zip(bpe_document.sentences, bpe_document.speakers)):
-    curr_sent_len = len(sentence)
-    if (len(current_segment) + curr_sent_len + 2 >= max_segment_len
-        or i == len(bpe_document.sentences) - 1):
-      # A segment is complete, put it away and update the subtoken remap
-      seg_document.sentences.append([CLS] + current_segment + [SEP])
-      seg_document.speakers.append([SPL] + current_speakers + [SPL])
-      subtoken_offset += 1 # for the CLS
-      subtoken_offsets += [subtoken_offset] * len(current_segment)
-      subtoken_offset += 1 # for the SEP
-      
-      current_segment = sentence
-      current_speakers = speakers
+  for i, sentence in enumerate(bpe_document.sentences):
+    if len(sentence) + current_segment_len + 2 <= max_segment_len:
+      current_segment.append(i)
+      current_segment_len += len(sentence)
     else:
-      current_segment += sentence
-      current_speakers += speakers
-  
+      segment_maps.append(current_segment)
+      current_segment = [i]
+      current_segment_len = len(sentence)
+  if current_segment:
+    segment_maps.append(current_segment)
 
-  print(len(subtoken_offsets))
-  print(subtoken_offsets)
 
+  subtoken_offsets = []
+  subtoken_offset = 0
+  for sentence_indices in segment_maps:
+    segment = [CLS] + flatten(bpe_document.sentences[i] for i in sentence_indices) + [SEP]
+    speakers = [CLS] + flatten(bpe_document.speakers[i] for i in sentence_indices) + [SEP]
+    seg_document.sentences.append(segment)
+    seg_document.speakers.append(speakers)
+    subtoken_offset += 1 # for the CLS token
+    subtoken_offsets += [subtoken_offset] * (len(segment) - 2)
+    subtoken_offset += 1 # for the SEP token
+   
+  bpe_flat = flatten(bpe_document.sentences)
+  seg_flat = flatten(seg_document.sentences)
 
-  #flat_sent = flatten(self.tokenized_sentences)
-  #for i, k in enumerate(doc_segments):
-  #  print("%%", i, len(k), k)
-  #flat_seg = flatten(doc_segments)
-  #seg_clusters = []
-  #for cluster in self.clusters:
-  #  new_cluster = []
-  #  for start, end in cluster:
-  #    print("^^", flat_sent[start-1:end])
-  #    print(start, end)
-  #    new_start, new_end = start + subtoken_offsets[start], end + subtoken_offsets[end]
-  #    new_cluster.append([new_start, new_end])
-  #    print("***", flat_seg[new_start:new_end+1])
-  #    #print("---", flat_sent[start:end+1])
-  #  print()
-  #  seg_clusters.append(new_cluster)
-
+  for cluster in bpe_document.clusters:
+    new_cluster = []
+    for start, end in cluster:
+      new_start = start + subtoken_offsets[start]
+      new_end = end + subtoken_offsets[end]
+      new_cluster.append([new_start, new_end])
+    seg_document.clusters.append(new_cluster)
 
   return seg_document
     
-
-                           
-    
+ 
 def write_converted(dataset, prefix):
   dataset.dump_to_jsonl(prefix + ".jsonl")
