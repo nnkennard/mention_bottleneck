@@ -13,7 +13,7 @@ def get_lines_from_file(filename):
     return f.readlines()
 
 def condense_sentences(sentences):
-  """I literally don't know what this is for..."""
+  """Need to figure out what this actually does and why."""
   sentence_index_map = {}
   new_sentences = []
   modified_sentence_count = 0
@@ -48,8 +48,9 @@ def create_dataset(filename):
 
   for line in tqdm.tqdm(lines):
     orig_document = json.loads(line)
-    new_document = convert_lib.Document(
-        convert_lib.make_doc_id("preco", orig_document["id"]), DUMMY_DOC_PART)
+    new_document = convert_lib.CorefDocument(
+        convert_lib.make_doc_id("preco", orig_document["id"]), DUMMY_DOC_PART,
+            init_status=convert_lib.ProcessingStage.TOKENIZED)
     sentence_offsets = []
     token_count = 0
   
@@ -66,11 +67,12 @@ def create_dataset(filename):
           new_cluster.append([sentence_offsets[modified_sentence] + begin,
           sentence_offsets[modified_sentence] + end - 1])
         new_document.clusters.append(new_cluster)
-    dataset.documents.append(new_document)
+    dataset.documents[convert_lib.ProcessingStage.TOKENIZED].append(new_document)
 
   return dataset
 
 def convert_format(data_home):
+  """Convert preco json format into spanbert json format."""
   input_directory = os.path.join(data_home, "original", "preco")
   output_directory = os.path.join(data_home, "processed", "preco/all_info")
   convert_lib.create_dir(output_directory)
@@ -123,7 +125,9 @@ def create_injected_file(superset_filename, inject_type):
 
 
 def convert(data_home):
+  # Just makes train-test splits
   preco_lib.preprocess(data_home)
+
   convert_format(data_home)
   superset_dir = os.path.join(data_home, "processed", "preco/all_info")
   for subset in ["train", "dev", "test"]:

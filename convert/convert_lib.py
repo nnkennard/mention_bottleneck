@@ -53,22 +53,27 @@ class Dataset(object):
     self.documents = collections.defaultdict(list)
 
   def dump_to_jsonl(self, file_name):
-    assert file_name.endswith(".jsonl")
     
     assert ProcessingStage.TOKENIZED in self.documents
+
     if ProcessingStage.BPE_TOKENIZED not in self.documents:
       self.documents[ProcessingStage.BPE_TOKENIZED] = [
         bpe_tokenize_document(document, TOKENIZER)
         for document in self.documents[ProcessingStage.TOKENIZED]]
 
+    
     for new_stage in [
       ProcessingStage.SEGMENTED_384, ProcessingStage.SEGMENTED_512]:
+      if new_stage in self.documents:
+        continue
 
       self.documents[new_stage] = [
         segment_document(document, new_stage)
         for document in self.documents[ProcessingStage.BPE_TOKENIZED]]
       lines = [doc.dump_to_json() for doc in self.documents[new_stage]]
 
+    
+      assert file_name.endswith(".jsonl")
       seg_filename =  file_name.replace(".jsonl", "_" + new_stage + ".jsonl")
       with open(seg_filename, 'w') as f:
         f.write("\n".join(lines))
@@ -87,12 +92,12 @@ class ProcessingStage(object):
 
 
 class CorefDocument(object):
-  def __init__(self, doc_id, part,
-      initial_status=ProcessingStage.UNINITIALIZED):
+  def __init__(self, doc_id, part, other_info="{}",
+      init_status=ProcessingStage.UNINITIALIZED):
 
     self.doc_id = doc_id
     self.doc_part = part
-    self.status=initial_status
+    self.status=init_status
 
     self.clusters = []
     self.injected_mentions = []
@@ -102,7 +107,7 @@ class CorefDocument(object):
     self.subtoken_map = []
     self.sentence_map = []
 
-    self.other_info_json = None
+    self.other_info_json = other_info
 
 
   def dump_to_json(self):
@@ -117,18 +122,22 @@ class CorefDocument(object):
           "speakers": self.speakers,
           "clusters": self.clusters,
           "inject_mentions": self.injected_mentions,
-          "other_info": json.loads(self.other_info_json)
+          "other_info": json.loads(self.other_info_json),
+          "format": self.status,
         })
     
 
 def all_same(l):
   return len(set(l)) == 1
 
+def same_len(l):
+  return all_same(len(i) for i in l)
+
 def bpe_tokenize_document(document, tokenizer):
   assert document.status == ProcessingStage.TOKENIZED
 
   bpe_document = CorefDocument(document.doc_id, document.doc_part,
-    ProcessingStage.BPE_TOKENIZED)
+      document.other_info_json, ProcessingStage.BPE_TOKENIZED)
 
   token_to_starting_subtoken = []
   token_to_ending_subtoken = []
@@ -145,13 +154,14 @@ def bpe_tokenize_document(document, tokenizer):
     subword_list = [TOKENIZER.tokenize(token) for token in sentence]
 
     # Construct mapping to subtoken for use in cluster stuff later
-    subtoken_offset = len(bpe_document.subtoken_map) # +1 for the CLS
+    subtoken_offset = len(bpe_document.subtoken_map) # subtokens included so far
     for i, (token, subwords) in enumerate(zip(sentence, subword_list)):
       token_to_starting_subtoken.append(subtoken_offset)
       subtoken_offset += len(subwords)
       token_to_ending_subtoken.append(subtoken_offset - 1) # inclusive
 
-    subword_to_word = flatten(
+    # For each subword, which original token did it come from (index from flat list)
+    subtoken_map = flatten(
       [
         [in_sentence_token_idx + cum_doc_token_count] * len(token_subwords)
         for in_sentence_token_idx, token_subwords in
@@ -161,30 +171,25 @@ def bpe_tokenize_document(document, tokenizer):
 
     # Build various fields
     bpe_document.sentences.append(flattened_subword)
-    bpe_document.sentence_map += [sentence_idx] * len(flattened_subword)  # fix this
-    bpe_document.subtoken_map += subword_to_word
+    bpe_document.subtoken_map += subtoken_map
     bpe_document.speakers.append([speaker] * len(flattened_subword))
 
+    # For each subtoken, which sentence did it come from (by idx)
+    bpe_document.sentence_map += [sentence_idx] * len(flattened_subword) 
+
     cum_doc_token_count += len(sentence)
-  assert all_same([len(token_to_ending_subtoken),
-      len(token_to_starting_subtoken), len(flatten(document.sentences))])
+
+  assert same_len([token_to_ending_subtoken, token_to_starting_subtoken,
+                   flatten(document.sentences)])
            
 
   # Remap clusters
   
-  flat_tok = flatten(document.sentences)
-  flat_bpe = flatten(bpe_document.sentences)
-
-  #for i, tok in enumerate(flat_bpe):
-  #  print(i, tok)
-
   for cluster in document.clusters:
     new_cluster = []
     for start, end in cluster:
-      #print("tok_doc ", start, end, flat_tok[start:end+1])
       new_start = token_to_starting_subtoken[start] 
       new_end = token_to_ending_subtoken[end]
-      #print("bpe_doc ", new_start, new_end, flat_bpe[new_start:new_end+1])
       new_cluster.append([new_start, new_end])
     bpe_document.clusters.append(new_cluster)
   
@@ -194,17 +199,23 @@ def bpe_tokenize_document(document, tokenizer):
 STAGE_TO_LEN ={ProcessingStage.SEGMENTED_384: 384,
                ProcessingStage.SEGMENTED_512: 512}
 
+
 def segment_document(bpe_document, new_stage):
   assert bpe_document.status == ProcessingStage.BPE_TOKENIZED
   max_segment_len = STAGE_TO_LEN[new_stage]
-  seg_document = CorefDocument(
-      bpe_document.doc_id, bpe_document.doc_part, new_stage)
 
+  seg_document = CorefDocument(
+      bpe_document.doc_id, bpe_document.doc_part, bpe_document.other_info_json,
+      new_stage)
+
+  # For each segment, a list of sentence indices which are part of that segment
   segment_maps = []
   current_segment = []
   current_segment_len = 0
-
+  
+  # Building segment maps
   for i, sentence in enumerate(bpe_document.sentences):
+    # 2 is added for CLS and SEP
     if len(sentence) + current_segment_len + 2 <= max_segment_len:
       current_segment.append(i)
       current_segment_len += len(sentence)
@@ -216,20 +227,21 @@ def segment_document(bpe_document, new_stage):
     segment_maps.append(current_segment)
 
 
+  # For each subtoken, how many indices it is bumped by due to CLS and SEP tokens
   subtoken_offsets = []
   subtoken_offset = 0
+
   for sentence_indices in segment_maps:
     segment = [CLS] + flatten(bpe_document.sentences[i] for i in sentence_indices) + [SEP]
-    speakers = [CLS] + flatten(bpe_document.speakers[i] for i in sentence_indices) + [SEP]
+    speakers = [SPL] + flatten(bpe_document.speakers[i] for i in sentence_indices) + [SPL]
     seg_document.sentences.append(segment)
     seg_document.speakers.append(speakers)
+
     subtoken_offset += 1 # for the CLS token
     subtoken_offsets += [subtoken_offset] * (len(segment) - 2)
     subtoken_offset += 1 # for the SEP token
    
-  bpe_flat = flatten(bpe_document.sentences)
-  seg_flat = flatten(seg_document.sentences)
-
+  # Remap clusters
   for cluster in bpe_document.clusters:
     new_cluster = []
     for start, end in cluster:

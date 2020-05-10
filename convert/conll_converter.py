@@ -48,7 +48,7 @@ def create_dataset(filename, dataset_name):
     curr_doc_part = begin_line[-1]
 
     curr_doc = convert_lib.CorefDocument(
-        curr_doc_id, curr_doc_part, convert_lib.ProcessingStage.TOKENIZED)
+        curr_doc_id, curr_doc_part, init_status=convert_lib.ProcessingStage.TOKENIZED)
 
     sentences = doc[1:-1] # Excluding the #begin and #end lines
     for sentence in sentences:
