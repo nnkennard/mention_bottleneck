@@ -105,6 +105,7 @@ class CorefDocument(object):
     self.subtoken_map = []
     self.sentence_map = []
 
+    self.token_sentences = [] # Need to thread this through for parsing later
     self.other_info_json = other_info
 
 
@@ -136,6 +137,8 @@ def bpe_tokenize_document(document, tokenizer):
 
   bpe_document = CorefDocument(document.doc_id, document.doc_part,
       document.other_info_json, ProcessingStage.BPE_TOKENIZED)
+
+  bpe_document.token_sentences = document.sentences
 
   token_to_starting_subtoken = []
   token_to_ending_subtoken = []
@@ -182,20 +185,52 @@ def bpe_tokenize_document(document, tokenizer):
            
 
   # Remap clusters
+
+  bpe_document.clusters = remap_clusters(document.clusters,
+                                         token_to_starting_subtoken,
+                                         token_to_ending_subtoken,
+                                         cumulative=False)
+
+  (bpe_document.injected_mentions, ) = remap_clusters(
+      [document.injected_mentions], token_to_starting_subtoken,
+      token_to_ending_subtoken, cumulative=False)
+                            
   
-  for cluster in document.clusters:
-    new_cluster = []
-    for start, end in cluster:
-      new_start = token_to_starting_subtoken[start] 
-      new_end = token_to_ending_subtoken[end]
-      new_cluster.append([new_start, new_end])
-    bpe_document.clusters.append(new_cluster)
+  #for cluster in document.clusters:
+  #  new_cluster = []
+  #  for start, end in cluster:
+  #    new_start = token_to_starting_subtoken[start] 
+  #    new_end = token_to_ending_subtoken[end]
+  #    new_cluster.append([new_start, new_end])
+  #  bpe_document.clusters.append(new_cluster)
   
   return bpe_document
   
 
 STAGE_TO_LEN ={ProcessingStage.SEGMENTED_384: 384,
                ProcessingStage.SEGMENTED_512: 512}
+
+def remap_clusters(clusters, start_offsets, optional_end_ofsfets=None, cumulative=False):
+  """Remap clusters. If cumulative, add offset to indices."""
+  if optional_end_offsets is None:
+    end_offsets = start_offsets
+  else:
+    end_offsets = optional_end_offsets
+    
+  new_clusters = []
+  for cluster in clusters:
+    new_cluster = []
+    for start, end in cluster:
+      if cumulative:
+        new_start = start + start_offsets[start]
+        new_end = end + end_offsets[end]
+      else:
+        new_start = start_offsets[start]
+        new_end = end_offsets[end]
+      new_cluster.append([new_start, new_end])
+    new_clusters.append(new_cluster)
+
+  return new_clusters
 
 
 def segment_document(bpe_document, new_stage):
@@ -205,6 +240,8 @@ def segment_document(bpe_document, new_stage):
   seg_document = CorefDocument(
       bpe_document.doc_id, bpe_document.doc_part, bpe_document.other_info_json,
       new_stage)
+
+  seg_document.token_sentences = bpe_document.sentences
 
   # For each segment, a list of sentence indices which are part of that segment
   segment_maps = []
@@ -247,6 +284,14 @@ def segment_document(bpe_document, new_stage):
       new_end = end + subtoken_offsets[end]
       new_cluster.append([new_start, new_end])
     seg_document.clusters.append(new_cluster)
+
+  seg_document.clusters = remap_clusters(bpe_document.clusters,
+                                         subtoken_offsets,
+                                         cumulative=True)
+
+  (seg_document.injected_mentions, ) = remap_clusters(
+      [bpe_document.injected_mentions], subtoken_offsets, cumulative=True)
+                             
 
   return seg_document
     
