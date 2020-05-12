@@ -64,14 +64,12 @@ class Dataset(object):
     
     for new_stage in [
       ProcessingStage.SEGMENTED_384, ProcessingStage.SEGMENTED_512]:
-      if new_stage in self.documents:
-        continue
+      if new_stage not in self.documents:
+        self.documents[new_stage] = [
+          segment_document(document, new_stage)
+          for document in self.documents[ProcessingStage.BPE_TOKENIZED]]
 
-      self.documents[new_stage] = [
-        segment_document(document, new_stage)
-        for document in self.documents[ProcessingStage.BPE_TOKENIZED]]
       lines = [doc.dump_to_json() for doc in self.documents[new_stage]]
-
     
       assert file_name.endswith(".jsonl")
       seg_filename =  file_name.replace(".jsonl", "_" + new_stage + ".jsonl")
