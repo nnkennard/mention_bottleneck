@@ -110,7 +110,9 @@ FN_MAP = {
 def keep_singletons(inject_type):
   return inject_type == "goldsing"
 
-def create_injected_file(superset_filename, inject_type):
+def create_injected_file(superset_filename, inject_type, max_seg_len):
+  print("Superset filename:", superset_filename)
+  superset_filename = superset_filename.replace(".jsonl", "_"+max_seg_len + ".jsonl")
   examples = get_examples(superset_filename)
   for example in examples:
     example["injected_mentions"] = FN_MAP[inject_type](example)
@@ -134,4 +136,6 @@ def convert(data_home):
     all_info_filename = superset_dir + "/" + subset + ".jsonl"
     for new_type in FN_MAP.keys():
       convert_lib.create_dir(superset_dir + "/" + new_type)
-      create_injected_file(all_info_filename, new_type)
+      for max_seg_len in [convert_lib.ProcessingStage.SEGMENTED_384,
+                          convert_lib.ProcessingStage.SEGMENTED_512]:
+        create_injected_file(all_info_filename, new_type, max_seg_len)

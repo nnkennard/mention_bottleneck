@@ -122,6 +122,9 @@ class CorefDocument(object):
           "clusters": self.clusters,
           "inject_mentions": self.injected_mentions,
           "other_info": json.loads(self.other_info_json),
+          "token_sentences": self.token_sentences,
+          "bpe_maps": self.bpe_maps,
+          "subtoken_offsets": self.subtoken_offsets,
           "format": self.status,
         })
     
@@ -182,6 +185,8 @@ def bpe_tokenize_document(document, tokenizer):
 
   assert same_len([token_to_ending_subtoken, token_to_starting_subtoken,
                    flatten(document.sentences)])
+  assert same_len([bpe_document.sentence_map,
+                   bpe_document.subtoken_map, flatten(bpe_document.sentences)])
            
 
   # Remap clusters
@@ -194,15 +199,10 @@ def bpe_tokenize_document(document, tokenizer):
   (bpe_document.injected_mentions, ) = remap_clusters(
       [document.injected_mentions], token_to_starting_subtoken,
       token_to_ending_subtoken, cumulative=False)
+
+  bpe_document.bpe_maps = [token_to_starting_subtoken,
+                           token_to_ending_subtoken]
                             
-  
-  #for cluster in document.clusters:
-  #  new_cluster = []
-  #  for start, end in cluster:
-  #    new_start = token_to_starting_subtoken[start] 
-  #    new_end = token_to_ending_subtoken[end]
-  #    new_cluster.append([new_start, new_end])
-  #  bpe_document.clusters.append(new_cluster)
   
   return bpe_document
   
@@ -210,7 +210,8 @@ def bpe_tokenize_document(document, tokenizer):
 STAGE_TO_LEN ={ProcessingStage.SEGMENTED_384: 384,
                ProcessingStage.SEGMENTED_512: 512}
 
-def remap_clusters(clusters, start_offsets, optional_end_ofsfets=None, cumulative=False):
+def remap_clusters(clusters, start_offsets, optional_end_offsets=None,
+                   cumulative=False):
   """Remap clusters. If cumulative, add offset to indices."""
   if optional_end_offsets is None:
     end_offsets = start_offsets
@@ -241,7 +242,8 @@ def segment_document(bpe_document, new_stage):
       bpe_document.doc_id, bpe_document.doc_part, bpe_document.other_info_json,
       new_stage)
 
-  seg_document.token_sentences = bpe_document.sentences
+  seg_document.token_sentences = bpe_document.token_sentences
+  seg_document.bpe_maps = bpe_document.bpe_maps
 
   # For each segment, a list of sentence indices which are part of that segment
   segment_maps = []
@@ -266,24 +268,39 @@ def segment_document(bpe_document, new_stage):
   subtoken_offsets = []
   subtoken_offset = 0
 
+  prev_subtoken = 0
   for sentence_indices in segment_maps:
-    segment = [CLS] + flatten(bpe_document.sentences[i] for i in sentence_indices) + [SEP]
-    speakers = [SPL] + flatten(bpe_document.speakers[i] for i in sentence_indices) + [SPL]
+    start_sentence_idx = sentence_indices[0]
+    exc_end_sentence_idx = sentence_indices[-1] + 1
+    first_subtoken_index = len(flatten(bpe_document.sentences[:start_sentence_idx]))
+    last_subtoken_index = len(flatten(bpe_document.sentences[:exc_end_sentence_idx]))
+
+    segment = [CLS] + flatten(bpe_document.sentences[start_sentence_idx:exc_end_sentence_idx]) + [SEP]
     seg_document.sentences.append(segment)
-    seg_document.speakers.append(speakers)
+    seg_document.speakers.append(
+      [SPL] + flatten(bpe_document.speakers[start_sentence_idx:exc_end_sentence_idx]) + [SPL])
+
+    seg_document.subtoken_map.append( # CLS shares index of first word
+        bpe_document.subtoken_map[first_subtoken_index])
+    seg_document.subtoken_map +=  bpe_document.subtoken_map[first_subtoken_index:last_subtoken_index]
+    seg_document.subtoken_map.append( # Presumably SEP shares index of last word
+        bpe_document.subtoken_map[last_subtoken_index -  1])
+
+    seg_document.sentence_map.append( # CLS shares index of first word
+        bpe_document.sentence_map[first_subtoken_index])
+    seg_document.sentence_map +=  bpe_document.sentence_map[first_subtoken_index:last_subtoken_index]
+    seg_document.sentence_map.append( # Presumably SEP shares index of last word
+        bpe_document.sentence_map[last_subtoken_index -  1])
 
     subtoken_offset += 1 # for the CLS token
     subtoken_offsets += [subtoken_offset] * (len(segment) - 2)
     subtoken_offset += 1 # for the SEP token
+  
    
-  # Remap clusters
-  for cluster in bpe_document.clusters:
-    new_cluster = []
-    for start, end in cluster:
-      new_start = start + subtoken_offsets[start]
-      new_end = end + subtoken_offsets[end]
-      new_cluster.append([new_start, new_end])
-    seg_document.clusters.append(new_cluster)
+  assert same_len([subtoken_offsets,
+                   flatten(bpe_document.sentences)])
+  assert same_len([seg_document.sentence_map,
+                   seg_document.subtoken_map, flatten(seg_document.sentences)])
 
   seg_document.clusters = remap_clusters(bpe_document.clusters,
                                          subtoken_offsets,
@@ -291,8 +308,9 @@ def segment_document(bpe_document, new_stage):
 
   (seg_document.injected_mentions, ) = remap_clusters(
       [bpe_document.injected_mentions], subtoken_offsets, cumulative=True)
+  
+  seg_document.subtoken_offsets = subtoken_offsets
                              
-
   return seg_document
     
  
