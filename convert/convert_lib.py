@@ -280,17 +280,19 @@ def segment_document(bpe_document, new_stage):
     seg_document.speakers.append(
       [SPL] + flatten(bpe_document.speakers[start_sentence_idx:exc_end_sentence_idx]) + [SPL])
 
-    seg_document.subtoken_map.append( # CLS shares index of first word
-        bpe_document.subtoken_map[first_subtoken_index])
+    seg_document.subtoken_map.append( # CLS takes previous subtoken index
+        prev_subtoken)
     seg_document.subtoken_map +=  bpe_document.subtoken_map[first_subtoken_index:last_subtoken_index]
+    this_sentence_last_subtoken = bpe_document.subtoken_map[last_subtoken_index - 1]
     seg_document.subtoken_map.append( # Presumably SEP shares index of last word
-        bpe_document.subtoken_map[last_subtoken_index -  1])
+        this_sentence_last_subtoken)
+    prev_subtoken = this_sentence_last_subtoken
 
     seg_document.sentence_map.append( # CLS shares index of first word
         bpe_document.sentence_map[first_subtoken_index])
     seg_document.sentence_map +=  bpe_document.sentence_map[first_subtoken_index:last_subtoken_index]
-    seg_document.sentence_map.append( # Presumably SEP shares index of last word
-        bpe_document.sentence_map[last_subtoken_index -  1])
+    seg_document.sentence_map.append( # SEP has index of presumptive next sentence
+        bpe_document.sentence_map[last_subtoken_index -  1] + 1)
 
     subtoken_offset += 1 # for the CLS token
     subtoken_offsets += [subtoken_offset] * (len(segment) - 2)
