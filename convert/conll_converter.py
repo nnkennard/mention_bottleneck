@@ -68,13 +68,16 @@ def create_dataset(filename, dataset_name):
     curr_doc.clusters = true_clusters
     curr_doc.additional_mentions = additional_mentions
     dataset.documents[convert_lib.ProcessingStage.TOKENIZED].append(curr_doc)
+
+  if dataset_name == "classic":
+    dataset.dump_to_conll(filename.replace(".txt", ".conll"),
+                          drop_singletons=True)
     
   return dataset
 
 def create_alternate_subdataset(data_home, original_dataset, new_dataset):
   input_directory = os.path.join(
       data_home, "original", original_dataset)
-  print(input_directory)
   output_directory = os.path.join(data_home, "original/conll_alternates", new_dataset)
   convert_lib.create_dir(output_directory)
     

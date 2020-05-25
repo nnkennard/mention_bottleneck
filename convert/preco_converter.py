@@ -80,6 +80,9 @@ def convert_format(data_home):
     convert_lib.DatasetSplit.test]:
     input_filename = os.path.join(input_directory, split + ".jsonl")
     converted_dataset = create_dataset(input_filename)
+    for drop_singeltons in [True, False]:
+      converted_dataset.dump_to_conll(input_filename.replace(".jsonl", ".conll"),
+        drop_singeltons)
     convert_lib.write_converted(converted_dataset, output_directory + "/" + split)
  
 
@@ -111,8 +114,7 @@ def keep_singletons(inject_type):
   return inject_type == "goldsing"
 
 def create_injected_file(superset_filename, inject_type, max_seg_len):
-  print("Superset filename:", superset_filename)
-  superset_filename = superset_filename.replace(".jsonl", "_"+max_seg_len + ".jsonl")
+  superset_filename = superset_filename.replace(".jsonl", "_" + max_seg_len + ".jsonl")
   examples = get_examples(superset_filename)
   for example in examples:
     example["injected_mentions"] = FN_MAP[inject_type](example)
@@ -126,6 +128,29 @@ def create_injected_file(superset_filename, inject_type, max_seg_len):
     f.write("\n".join(json.dumps(example) for example in examples))
 
 
+_maybe_unused = """
+def conllify_dataset(jsonl_file):
+  conll_file = jsonl_file.replace(".jsonl", ".conll")
+  dataset = convert_lib.Dataset("preco")
+  for labels in ["sing", "classic"]:
+    conll_file = conll_file.replace(".conll", "." + labels + ".conll")
+    with open(jsonl_file, 'r') as f:
+      for line in f:
+        example = json.loads(line)
+        doc_id, part = example["doc_key"].rsplit("_", 1)
+        document = convert_lib.CorefDocument(doc_id, part)
+        document.status = convert_lib.ProcessingStage.TOKENIZED
+        if label == "sing":
+          clusters = example["clusters"]
+        else:
+          assert label == "classic"
+          clusters = [cluster for cluster in example["clusters"] if len(cluster) > 1]
+        document.clusters = clusters
+        document.sentences = example["sentences"]
+        document.speakers = example["speakers"]
+      dataset.documents[convert_lib.ProcessingStage.TOKENIZED].append(document)
+    dataset.dump_to_conll(conll_file)"""
+
 def convert(data_home):
   # Just makes train-test splits
   preco_lib.preprocess(data_home)
@@ -135,7 +160,7 @@ def convert(data_home):
   for subset in ["train", "dev", "test"]:
     all_info_filename = superset_dir + "/" + subset + ".jsonl"
     for new_type in FN_MAP.keys():
-      convert_lib.create_dir(superset_dir + "/" + new_type)
       for max_seg_len in [convert_lib.ProcessingStage.SEGMENTED_384,
                           convert_lib.ProcessingStage.SEGMENTED_512]:
         create_injected_file(all_info_filename, new_type, max_seg_len)
+

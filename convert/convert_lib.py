@@ -4,7 +4,7 @@ from bert import tokenization
 import json
 import os
 
-VOCAB_FILE = "/home/nnayak/mention_bottleneck/convert/cased_config_vocab/vocab.txt"
+VOCAB_FILE = "/mnt/nfs/scratch1/nnayak/mention_bottleneck/convert/cased_config_vocab/vocab.txt"
 TOKENIZER = tokenization.FullTokenizer(vocab_file=VOCAB_FILE, do_lower_case=False)
 
 class DatasetName(object):
@@ -53,7 +53,7 @@ class Dataset(object):
     self.documents = collections.defaultdict(list)
 
   def dump_to_jsonl(self, file_name):
-    
+
     assert ProcessingStage.TOKENIZED in self.documents
 
     if ProcessingStage.BPE_TOKENIZED not in self.documents:
@@ -61,7 +61,6 @@ class Dataset(object):
         bpe_tokenize_document(document, TOKENIZER)
         for document in self.documents[ProcessingStage.TOKENIZED]]
 
-    
     for new_stage in [
       ProcessingStage.SEGMENTED_384, ProcessingStage.SEGMENTED_512]:
       if new_stage not in self.documents:
@@ -75,6 +74,21 @@ class Dataset(object):
       seg_filename =  file_name.replace(".jsonl", "_" + new_stage + ".jsonl")
       with open(seg_filename, 'w') as f:
         f.write("\n".join(lines))
+
+  def dump_to_conll(self, file_name, drop_singletons=False):
+    assert ProcessingStage.TOKENIZED in self.documents
+
+    lines = [doc.dump_to_conll(drop_singletons)
+             for doc in self.documents[ProcessingStage.TOKENIZED]]
+  
+    print("writing conll file")
+    assert file_name.endswith(".conll")
+    if drop_singletons:
+      file_name = file_name.replace(".conll", ".classic.conll")
+    else:
+      file_name = file_name.replace(".conll", ".sing.conll")
+    with open(file_name, 'w') as f:
+      f.write("\n".join(lines))
 
 
 def flatten(nonflat):
@@ -127,7 +141,52 @@ class CorefDocument(object):
           "subtoken_offsets": self.subtoken_offsets,
           "format": self.status,
         })
-    
+
+  def _update_label(self, original_label, additional_label):
+    if original_label == "-":
+      return additional_label
+    else:
+      return original_label + "|" + additional_label
+
+  def dump_to_conll(self, drop_singletons=False):
+    assert self.status == ProcessingStage.TOKENIZED
+    token_sentences = self.sentences
+    token_clusters = self.clusters
+    if drop_singletons:
+      token_clusters = [cluster for cluster in token_clusters if len(cluster) > 1]
+  
+    flat_coref_labels = ["-"] * len(flatten(token_sentences))
+    for idx, cluster in enumerate(token_clusters):
+      for start, end in cluster:
+        if start == end:
+          flat_coref_labels[start] = self._update_label(
+              flat_coref_labels[start], "({})".format(str(idx)))
+        else:
+          flat_coref_labels[start] = self._update_label(
+              flat_coref_labels[start], "({}".format(str(idx)))
+          flat_coref_labels[end] = self._update_label(
+              flat_coref_labels[end], "{})".format(str(idx)))
+
+    doc_lines = [
+        "#begin document ({}); part {}".format(self.doc_id, self.doc_part)]
+
+    str_doc_part = str(int(self.doc_part))
+    token_offset = 0
+    for sentence, speakers in zip(token_sentences, self.speakers):
+      coref_labels = flat_coref_labels[
+          token_offset:token_offset+len(sentence)]
+      token_offset += len(sentence)
+
+      for i, (token, label, speaker) in enumerate(
+          zip(sentence, coref_labels, speakers)):
+        doc_lines.append("\t".join([self.doc_id, str_doc_part, str(i), token,
+        "_POS", "_PARSE", "_", "_", "_", speaker, "*", label]))
+      doc_lines.append("")
+  
+    doc_lines.append("#end document")
+
+    return "\n".join(doc_lines)
+
 
 def all_same(l):
   return len(set(l)) == 1
@@ -142,6 +201,7 @@ def bpe_tokenize_document(document, tokenizer):
       document.other_info_json, ProcessingStage.BPE_TOKENIZED)
 
   bpe_document.token_sentences = document.sentences
+  bpe_document.token_clusters = document.clusters
 
   token_to_starting_subtoken = []
   token_to_ending_subtoken = []
@@ -243,6 +303,7 @@ def segment_document(bpe_document, new_stage):
       new_stage)
 
   seg_document.token_sentences = bpe_document.token_sentences
+  seg_document.token_clusters = bpe_document.token_clusters
   seg_document.bpe_maps = bpe_document.bpe_maps
 
   # For each segment, a list of sentence indices which are part of that segment
